@@ -1,19 +1,20 @@
-//! Blinks the LED on a Pico board
-//!
-//! This will blink an LED attached to GP25, which is the pin the Pico uses for the on-board LED.
 #![no_std]
 #![no_main]
 
 use bsp::entry;
 use defmt::*;
-use defmt_rtt as _;
-use embedded_hal::digital::OutputPin;
+
+#[allow(unused_imports)]
+use defmt::*;
+#[allow(unused_imports)]
+use defmt_rtt as _f;
+#[allow(unused_imports)]
 use panic_probe as _;
 
 // Provide an alias for our BSP so we can switch targets quickly.
 // Uncomment the BSP you included in Cargo.toml, the rest of the code does not need to change.
-use rp_pico as bsp;
-// use sparkfun_pro_micro_rp2040 as bsp;
+use waveshare_rp2040_zero as bsp;
+use waveshare_rp2040_zero::{Gp0Spi0Rx, Gp1Spi0Csn, Gp2Spi0Sck, Gp3Spi0Tx};
 
 use bsp::hal::{
     clocks::{init_clocks_and_plls, Clock},
@@ -21,6 +22,15 @@ use bsp::hal::{
     sio::Sio,
     watchdog::Watchdog,
 };
+use display_interface_spi::{SPIInterfaceNoCS};
+use embedded_graphics::pixelcolor::Rgb565;
+use embedded_graphics::prelude::*;
+use embedded_graphics::primitives::{PrimitiveStyle, Rectangle, StyledDrawable};
+use embedded_hal::digital::OutputPin;
+use embedded_hal::spi::MODE_0;
+use fugit::RateExtU32;
+use mipidsi::Builder;
+use mipidsi::options::TearingEffect;
 
 #[entry]
 fn main() -> ! {
@@ -53,25 +63,64 @@ fn main() -> ! {
         &mut pac.RESETS,
     );
 
-    // This is the correct pin on the Raspberry Pico board. On other boards, even if they have an
-    // on-board LED, it might need to be changed.
-    //
-    // Notably, on the Pico W, the LED is not connected to any of the RP2040 GPIOs but to the cyw43 module instead.
-    // One way to do that is by using [embassy](https://github.com/embassy-rs/embassy/blob/main/examples/rp/src/bin/wifi_blinky.rs)
-    //
-    // If you have a Pico W and want to toggle a LED with a simple GPIO output pin, you can connect an external
-    // LED to one of the GPIO pins, and reference that pin here. Don't forget adding an appropriate resistor
-    // in series with the LED.
-    let mut led_pin = pins.led.into_push_pull_output();
+
+    let mut led_pin = pins.gp5.into_push_pull_output();
+
+    // turn on the backlight
+    led_pin.set_high().unwrap();
+
+    let mut rst = pins.gp6.into_push_pull_output();
+    rst.set_high().unwrap();
+
+    let dc = pins.gp4.into_push_pull_output();
+
+    let rx: Gp0Spi0Rx = pins.gp0.reconfigure();
+    let tx: Gp3Spi0Tx = pins.gp3.reconfigure();
+    let _cs: Gp1Spi0Csn = pins.gp1.reconfigure();
+    let sck: Gp2Spi0Sck = pins.gp2.reconfigure();
+
+    let spi: bsp::hal::spi::Spi::<_, _, _, 8> = bsp::hal::spi::Spi::new(pac.SPI0, (tx, rx, sck));
+    let spi = spi.init(&mut pac.RESETS, clocks.peripheral_clock.freq(), 12000.kHz(), MODE_0);
+
+    let di = SPIInterfaceNoCS::new(spi, dc);
+
+    let mut display = Builder::ili9341_rgb565(di)
+        .with_display_size(320, 240)
+        .init(&mut delay, Some(rst)).unwrap();
+
+
+    display.set_tearing_effect(TearingEffect::HorizontalAndVertical).unwrap();
+    let rect = Rectangle::with_corners(Point::new(0, 0), Point::new(200, 200));
+
+    let mut pos = 0;
+
+    display.clear(Rgb565::CSS_INDIAN_RED).unwrap();
 
     loop {
-        info!("on!");
-        led_pin.set_high().unwrap();
-        delay.delay_ms(500);
-        info!("off!");
-        led_pin.set_low().unwrap();
-        delay.delay_ms(500);
+        for j in 0..10 {
+            for k in 0..10 {
+                display.set_pixel(pos + j, pos + k, Rgb565::CSS_INDIAN_RED).unwrap();
+
+            }
+        }
+
+        pos += 1;
+
+        for j in 0..10 {
+            for k in 0..10 {
+                display.set_pixel(pos + j, pos + k, Rgb565::CSS_GOLD).unwrap();
+
+            }
+        }
+
+        delay.delay_ms(16);
+
+        // display.clear(Rgb565::CSS_INDIAN_RED).unwrap();
+        // display.clear(Rgb565::new(r as u8, g as u8, b as u8)).unwrap();
+        // display.clear(Rgb565::CSS_INDIAN_RED).unwrap();
+        // display.clear(Rgb565::CSS_DARK_GOLDENROD).unwrap();
+        // display.clear(Rgb565::CSS_ROYAL_BLUE).unwrap();
+        // display.clear(Rgb565::CSS_GOLD).unwrap();
+        // display.clear(Rgb565::CSS_INDIGO).unwrap();
     }
 }
-
-// End of file
