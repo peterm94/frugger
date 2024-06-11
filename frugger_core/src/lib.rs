@@ -4,7 +4,7 @@ use core::convert::Infallible;
 
 use embedded_graphics::draw_target::DrawTarget;
 use embedded_graphics::geometry::{Dimensions, Point, Size};
-use embedded_graphics::mono_font::ascii::{FONT_6X10, FONT_8X13};
+use embedded_graphics::mono_font::ascii::FONT_8X13;
 use embedded_graphics::mono_font::MonoTextStyle;
 use embedded_graphics::Pixel;
 use embedded_graphics::pixelcolor::{PixelColor, Rgb565};
@@ -76,6 +76,7 @@ pub struct Frugger<'a, T> where T: DrawTarget<Color=Rgb565> {
     default_val: u8,
     last_frame: [u8; 38400],
     next_frame: [u8; 38400],
+    interlace: bool,
     display: &'a mut T,
 }
 
@@ -108,6 +109,7 @@ impl<'a, T> Frugger<'a, T> where
             default_val,
             last_frame: [u8::MAX; 38400],
             next_frame: [default_val; 38400],
+            interlace: false,
             display,
         }
     }
@@ -154,18 +156,35 @@ impl<'a, T> Frugger<'a, T> where
 
     pub fn draw_frame(&mut self)
     {
+        fn update_px<T>(me: &mut Frugger<T>, x: u16, y: u16) -> bool where
+            T: DrawTarget<Color=Rgb565> {
+            let next = me.get_pixel_value_next(x, y);
+            let last = me.get_pixel_value(x, y);
+            if next != last {
+                let rect = Rectangle::new(Point::new(x as i32, y as i32), Size::new(1, 1));
+                me.display.fill_solid(&rect, next.rgb565());
+                return true;
+            }
+            return false;
+        }
+
+        // if self.interlace {
+        //     self.display.clear(Rgb565::YELLOW);
+        // } else {
+        //     self.display.clear(Rgb565::BLACK);
+        // }
+
         let mut changed = 0;
+
         for y in 0..240 {
             for x in 0..320 {
-                let next = self.get_pixel_value_next(x, y);
-                let last = self.get_pixel_value(x, y);
-                if next != last {
-                    let rect = Rectangle::new(Point::new(x as i32, y as i32), Size::new(1, 1));
-                    self.display.fill_solid(&rect, next.rgb565());
+                if update_px(self, x, y) {
                     changed += 1;
                 }
             }
         }
+        self.interlace = !self.interlace;
+
 
         let text_style = MonoTextStyle::new(&FONT_8X13, FruggerColour::White);
         let ch = String::<10>::try_from(changed).unwrap();
@@ -181,6 +200,7 @@ impl<'a, T> Frugger<'a, T> where
 #[cfg(test)]
 mod tests {
     use embedded_graphics::primitives::PrimitiveStyleBuilder;
+
     use embedded_graphics_simulator::{BinaryColorTheme, OutputSettingsBuilder, SimulatorDisplay, Window};
 
     use super::*;

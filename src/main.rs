@@ -14,7 +14,7 @@ use defmt::*;
 #[allow(unused_imports)]
 use defmt_rtt as _f;
 use display_interface_spi::SPIInterfaceNoCS;
-use embedded_graphics::mono_font::ascii::FONT_6X10;
+use embedded_graphics::mono_font::ascii::{FONT_10X20, FONT_6X10};
 use embedded_graphics::mono_font::MonoTextStyle;
 use embedded_graphics::pixelcolor::Rgb565;
 use embedded_graphics::prelude::*;
@@ -22,7 +22,7 @@ use embedded_graphics::primitives::{PrimitiveStyleBuilder, Rectangle};
 use embedded_graphics::text::Text;
 use embedded_hal::digital::v2::OutputPin;
 use embedded_hal::spi::MODE_0;
-use fugit::RateExtU32;
+use fugit::{Rate, RateExtU32};
 use heapless::String;
 use mipidsi::{Builder, Orientation};
 #[allow(unused_imports)]
@@ -88,7 +88,7 @@ fn main() -> ! {
 
     let di = SPIInterfaceNoCS::new(spi, dc);
 
-    let mut display = Builder::st7789(di)
+    let mut display = Builder::ili9341_rgb565(di)
         .with_display_size(320, 240)
         .with_orientation(Orientation::Landscape(true))
         .init(&mut delay, Some(rst)).unwrap();
@@ -132,21 +132,16 @@ fn main() -> ! {
 
     let mut loc_text: String<4> = String::new();
 
+    let oofs = [[0, 10], [50, 100], [20, 0], [120, 40], [200, 21], [300, 179], [142, 65]];
+
     loop {
         x = (x + 1) % 320;
 
-        let rec2 = Rectangle::new(Point::new(0, 0), Size::new(10, 10))
-            .into_styled(f_style);
-        rec2.draw(&mut frugger);
-        let rec2 = Rectangle::new(Point::new(0, 230), Size::new(10, 10))
-            .into_styled(f_style);
-        rec2.draw(&mut frugger);
-        let rec2 = Rectangle::new(Point::new(310, 0), Size::new(10, 10))
-            .into_styled(f_style2);
-        rec2.draw(&mut frugger);
-        let rec2 = Rectangle::new(Point::new(x, 220), Size::new(20, 20))
-            .into_styled(f_style);
-        rec2.draw(&mut frugger);
+        for oof in oofs {
+            let rec2 = Rectangle::new(Point::new((oof[0] + x) % 320, oof[1]), Size::new(50, 50))
+                .into_styled(f_style);
+            rec2.draw(&mut frugger);
+        }
 
         loc_text.clear();
         let y = String::<4>::try_from(x).unwrap();
