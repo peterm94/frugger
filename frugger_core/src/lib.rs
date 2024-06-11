@@ -156,6 +156,31 @@ impl<'a, T> Frugger<'a, T> where
 
     pub fn draw_frame(&mut self)
     {
+        let mut cols = [Rgb565::BLACK; 320];
+
+        // iterate over rows
+        // if the row needs updating, draw the whole thing
+        // todo we can only draw the section that needs it instead of edge to edge
+        for y in 0..240 {
+            let old_row = &self.last_frame[y * 240..y * 240 + 320];
+            let new_row = &self.next_frame[y * 240..y * 240 + 320];
+
+            if !new_row.eq(old_row) {
+                // draw it
+                let area = Rectangle::new(Point::new(0, y as _), Size::new(240, 1));
+                for i in 0..320 {
+                    cols[i] = self.get_pixel_value_next(i as _, y as _).rgb565();
+                }
+                self.display.fill_contiguous(&area, cols);
+            }
+        }
+
+        self.last_frame.copy_from_slice(&self.next_frame);
+        self.next_frame.fill(self.default_val);
+    }
+
+    pub fn draw_frame2(&mut self)
+    {
         fn update_px<T>(me: &mut Frugger<T>, x: u16, y: u16) -> bool where
             T: DrawTarget<Color=Rgb565> {
             let next = me.get_pixel_value_next(x, y);
@@ -184,7 +209,6 @@ impl<'a, T> Frugger<'a, T> where
             }
         }
         self.interlace = !self.interlace;
-
 
         let text_style = MonoTextStyle::new(&FONT_8X13, FruggerColour::White);
         let ch = String::<10>::try_from(changed).unwrap();
