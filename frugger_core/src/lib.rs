@@ -4,14 +4,17 @@ use core::convert::Infallible;
 
 use embedded_graphics::draw_target::DrawTarget;
 use embedded_graphics::geometry::{Dimensions, Point, Size};
-use embedded_graphics::mono_font::ascii::FONT_8X13;
-use embedded_graphics::mono_font::MonoTextStyle;
 use embedded_graphics::Pixel;
 use embedded_graphics::pixelcolor::{PixelColor, Rgb565};
 use embedded_graphics::prelude::*;
 use embedded_graphics::primitives::Rectangle;
-use embedded_graphics::text::Text;
-use heapless::String;
+
+mod game;
+
+pub trait Palette {
+    fn colours() -> [Rgb565; 16];
+}
+
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub enum FruggerColour {
@@ -71,22 +74,20 @@ impl PixelColor for FruggerColour {
     type Raw = ();
 }
 
-pub struct Frugger<'a, T> where T: DrawTarget<Color=Rgb565> {
+pub struct Frugger {
     // 320 * 240 / 2
     default_val: u8,
     last_frame: [u8; 38400],
     next_frame: [u8; 38400],
-    interlace: bool,
-    display: &'a mut T,
 }
 
-impl<T> Dimensions for Frugger<'_, T> where T: DrawTarget<Color=Rgb565> {
+impl Dimensions for Frugger {
     fn bounding_box(&self) -> Rectangle {
         Rectangle::new(Point::new(0, 0), Size::new(320, 240))
     }
 }
 
-impl<T> DrawTarget for Frugger<'_, T> where T: DrawTarget<Color=Rgb565> {
+impl DrawTarget for Frugger {
     type Color = FruggerColour;
     type Error = Infallible;
 
@@ -101,16 +102,13 @@ impl<T> DrawTarget for Frugger<'_, T> where T: DrawTarget<Color=Rgb565> {
     }
 }
 
-impl<'a, T> Frugger<'a, T> where
-    T: DrawTarget<Color=Rgb565> {
-    pub fn new(bg_col: FruggerColour, display: &'a mut T) -> Self {
+impl Frugger {
+    pub fn new(bg_col: FruggerColour) -> Self {
         let default_val = bg_col.bits() | (bg_col.bits() << 4);
         Self {
             default_val,
             last_frame: [u8::MAX; 38400],
             next_frame: [default_val; 38400],
-            interlace: false,
-            display,
         }
     }
     fn get_pixel_value(&self, x: u16, y: u16) -> FruggerColour {
@@ -154,8 +152,7 @@ impl<'a, T> Frugger<'a, T> where
         }
     }
 
-    pub fn draw_frame2(&mut self)
-    {
+    pub fn draw_frame<T>(&mut self, display: &mut T) where T: DrawTarget<Color=Rgb565> {
         let mut cols = [Rgb565::BLACK; 320];
 
         // iterate over rows and draw continuous segments
@@ -174,7 +171,7 @@ impl<'a, T> Frugger<'a, T> where
                     run_length += 1;
                 } else if run_start != -1 && (next == last) {
                     let area = Rectangle::new(Point::new(run_start, y as _), Size::new(run_length as _, 1));
-                    self.display.fill_contiguous(&area, cols);
+                    display.fill_contiguous(&area, cols);
 
                     run_length = 0;
                     run_start = -1;
@@ -182,53 +179,13 @@ impl<'a, T> Frugger<'a, T> where
 
                 if x == 319 && run_start != -1 {
                     let area = Rectangle::new(Point::new(run_start, y as _), Size::new(run_length as _, 1));
-                    self.display.fill_contiguous(&area, cols);
+                    display.fill_contiguous(&area, cols);
                 }
             }
         }
 
         self.last_frame.copy_from_slice(&self.next_frame);
         self.next_frame.fill(self.default_val);
-    }
-
-    pub fn draw_frame(&mut self)
-    {
-        fn update_px<T>(me: &mut Frugger<T>, x: u16, y: u16) -> bool where
-            T: DrawTarget<Color=Rgb565> {
-            let next = me.get_pixel_value_next(x, y);
-            let last = me.get_pixel_value(x, y);
-            if next != last {
-                let rect = Rectangle::new(Point::new(x as i32, y as i32), Size::new(1, 1));
-                me.display.fill_solid(&rect, next.rgb565());
-                return true;
-            }
-            return false;
-        }
-
-        // if self.interlace {
-        //     self.display.clear(Rgb565::YELLOW);
-        // } else {
-        //     self.display.clear(Rgb565::BLACK);
-        // }
-
-        let mut changed = 0;
-
-        for y in 0..240 {
-            for x in 0..320 {
-                if update_px(self, x, y) {
-                    changed += 1;
-                }
-            }
-        }
-        self.interlace = !self.interlace;
-
-        let text_style = MonoTextStyle::new(&FONT_8X13, FruggerColour::White);
-        let ch = String::<10>::try_from(changed).unwrap();
-
-        // Override last frame with the new one
-        self.last_frame.copy_from_slice(&self.next_frame);
-        self.next_frame.fill(self.default_val);
-        Text::new(ch.as_str(), Point::new(100, 100), text_style).draw(self);
     }
 }
 
@@ -259,7 +216,7 @@ mod tests {
             .fill_color(FruggerColour::Orange)
             .build();
 
-        let mut frugger = Frugger::new(FruggerColour::Blue, &mut display);
+        let mut frugger = Frugger::new(FruggerColour::Blue);
 
         let rec2 = Rectangle::new(Point::new(0, 0), Size::new(10, 10))
             .into_styled(f_style);
@@ -274,7 +231,7 @@ mod tests {
             .into_styled(f_style);
         rec2.draw(&mut frugger);
 
-        frugger.draw_frame();
+        frugger.draw_frame(&mut display);
 
         Window::new("Hello World", &output_settings).show_static(&display);
     }
