@@ -13,6 +13,7 @@ mod game;
 
 pub trait Palette {
     fn colours() -> [Rgb565; 16];
+    fn index(&self) -> u8;
 }
 
 
@@ -94,10 +95,7 @@ impl DrawTarget for Frugger {
     fn draw_iter<I>(&mut self, pixels: I) -> Result<(), Self::Error> where I: IntoIterator<Item=Pixel<Self::Color>> {
         for Pixel(point, col) in pixels {
             self.write_pixel_value(point.x as u16, point.y as u16, col)
-            // let rect = Rectangle::new(Point::new(point.x as i32, point.y as i32), Size::new(1, 1));
-            // self.display.fill_solid(&rect, col.rgb565());
         }
-
         Ok(())
     }
 }
