@@ -154,24 +154,36 @@ impl<'a, T> Frugger<'a, T> where
         }
     }
 
-    pub fn draw_frame(&mut self)
+    pub fn draw_frame2(&mut self)
     {
         let mut cols = [Rgb565::BLACK; 320];
 
-        // iterate over rows
-        // if the row needs updating, draw the whole thing
-        // todo we can only draw the section that needs it instead of edge to edge
+        // iterate over rows and draw continuous segments
+        // todo we can cut the screen into a grid?
+        // todo make sure the draw direction is the one we actually want for the display
         for y in 0..240 {
-            let old_row = &self.last_frame[y * 240..y * 240 + 320];
-            let new_row = &self.next_frame[y * 240..y * 240 + 320];
+            let mut run_start: i32 = -1;
+            let mut run_length = 0;
+            for x in 0..320 {
+                let next = self.get_pixel_value_next(x, y);
+                let last = self.get_pixel_value(x, y);
 
-            if !new_row.eq(old_row) {
-                // draw it
-                let area = Rectangle::new(Point::new(0, y as _), Size::new(240, 1));
-                for i in 0..320 {
-                    cols[i] = self.get_pixel_value_next(i as _, y as _).rgb565();
+                if next != last {
+                    if run_start == -1 { run_start = x as _; }
+                    cols[run_length] = next.rgb565();
+                    run_length += 1;
+                } else if run_start != -1 && (next == last) {
+                    let area = Rectangle::new(Point::new(run_start, y as _), Size::new(run_length as _, 1));
+                    self.display.fill_contiguous(&area, cols);
+
+                    run_length = 0;
+                    run_start = -1;
                 }
-                self.display.fill_contiguous(&area, cols);
+
+                if x == 319 && run_start != -1 {
+                    let area = Rectangle::new(Point::new(run_start, y as _), Size::new(run_length as _, 1));
+                    self.display.fill_contiguous(&area, cols);
+                }
             }
         }
 
@@ -179,7 +191,7 @@ impl<'a, T> Frugger<'a, T> where
         self.next_frame.fill(self.default_val);
     }
 
-    pub fn draw_frame2(&mut self)
+    pub fn draw_frame(&mut self)
     {
         fn update_px<T>(me: &mut Frugger<T>, x: u16, y: u16) -> bool where
             T: DrawTarget<Color=Rgb565> {
@@ -224,7 +236,6 @@ impl<'a, T> Frugger<'a, T> where
 #[cfg(test)]
 mod tests {
     use embedded_graphics::primitives::PrimitiveStyleBuilder;
-
     use embedded_graphics_simulator::{BinaryColorTheme, OutputSettingsBuilder, SimulatorDisplay, Window};
 
     use super::*;
