@@ -9,7 +9,6 @@ use embedded_graphics::pixelcolor::{PixelColor, Rgb565};
 use embedded_graphics::prelude::*;
 use embedded_graphics::primitives::Rectangle;
 
-mod game;
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub enum Palette {
@@ -55,27 +54,28 @@ impl Into<Rgb565> for Palette {
 }
 
 impl Palette {
-    fn from_index(idx: u8) -> Self {
+    pub fn from_index(idx: &u8) -> Option<Self> {
         match idx {
-            0 => Palette::Black,
-            1 => Palette::Purple,
-            2 => Palette::Red,
-            3 => Palette::Orange,
-            4 => Palette::Yellow,
-            5 => Palette::Lime,
-            6 => Palette::Green,
-            7 => Palette::Teal,
-            8 => Palette::NavyBlue,
-            9 => Palette::DarkBlue,
-            10 => Palette::Blue,
-            11 => Palette::LightBlue,
-            12 => Palette::White,
-            13 => Palette::LightGrey,
-            14 => Palette::DarkGrey,
-            15 => Palette::BlueGrey,
-            _ => panic!()
+            0 => Some(Palette::Black),
+            1 => Some(Palette::Purple),
+            2 => Some(Palette::Red),
+            3 => Some(Palette::Orange),
+            4 => Some(Palette::Yellow),
+            5 => Some(Palette::Lime),
+            6 => Some(Palette::Green),
+            7 => Some(Palette::Teal),
+            8 => Some(Palette::NavyBlue),
+            9 => Some(Palette::DarkBlue),
+            10 => Some(Palette::Blue),
+            11 => Some(Palette::LightBlue),
+            12 => Some(Palette::White),
+            13 => Some(Palette::LightGrey),
+            14 => Some(Palette::DarkGrey),
+            15 => Some(Palette::BlueGrey),
+            _ => None
         }
     }
+
     fn bits(&self) -> u8 {
         *self as u8
     }
@@ -130,7 +130,7 @@ impl Frugger {
             self.last_frame[pixel_offset / 2] >> 4
         };
 
-        Palette::from_index(colour)
+        Palette::from_index(&colour).unwrap()
     }
 
     fn get_pixel_value_next(&self, x: u16, y: u16) -> Palette {
@@ -144,7 +144,7 @@ impl Frugger {
             self.next_frame[pixel_offset / 2] >> 4
         };
 
-        Palette::from_index(colour)
+        Palette::from_index(&colour).unwrap()
     }
 
     fn write_pixel_value(&mut self, x: u16, y: u16, colour: Palette) {
@@ -194,53 +194,5 @@ impl Frugger {
 
         self.last_frame.copy_from_slice(&self.next_frame);
         self.next_frame.fill(self.default_val);
-    }
-}
-
-
-#[cfg(test)]
-mod tests {
-    use embedded_graphics::primitives::PrimitiveStyleBuilder;
-    use embedded_graphics_simulator::{BinaryColorTheme, OutputSettingsBuilder, SimulatorDisplay, Window};
-
-    use super::*;
-
-    #[test]
-    fn it_works() {
-        let mut display = SimulatorDisplay::<Rgb565>::new(Size::new(320, 240));
-
-        let output_settings = OutputSettingsBuilder::new()
-            .theme(BinaryColorTheme::Default)
-            .build();
-
-        let f_style = PrimitiveStyleBuilder::new()
-            .stroke_color(Palette::Red)
-            .stroke_width(3)
-            .fill_color(Palette::Green)
-            .build();
-        let f_style2 = PrimitiveStyleBuilder::new()
-            .stroke_color(Palette::Purple)
-            .stroke_width(3)
-            .fill_color(Palette::Orange)
-            .build();
-
-        let mut frugger = Frugger::new(Palette::Blue);
-
-        let rec2 = Rectangle::new(Point::new(0, 0), Size::new(10, 10))
-            .into_styled(f_style);
-        rec2.draw(&mut frugger);
-        let rec2 = Rectangle::new(Point::new(0, 230), Size::new(10, 10))
-            .into_styled(f_style);
-        rec2.draw(&mut frugger);
-        let rec2 = Rectangle::new(Point::new(310, 0), Size::new(10, 10))
-            .into_styled(f_style2);
-        rec2.draw(&mut frugger);
-        let rec2 = Rectangle::new(Point::new(310, 230), Size::new(10, 10))
-            .into_styled(f_style);
-        rec2.draw(&mut frugger);
-
-        frugger.draw_frame(&mut display);
-
-        Window::new("Hello World", &output_settings).show_static(&display);
     }
 }
