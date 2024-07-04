@@ -40,7 +40,7 @@ impl<A: InputPin, B: InputPin, L: InputPin, R: InputPin, U: InputPin, D: InputPi
 }
 
 impl<A: InputPin, B: InputPin, L: InputPin, R: InputPin, U: InputPin, D: InputPin> ButtonInput for McInputs<A, B, L, R, U, D> {
-    fn tick(&self, inputs: &mut FrugInputs) {
+    fn tick(&mut self, inputs: &mut FrugInputs) {
         // set based on last frame
         for button in [&mut inputs.a, &mut inputs.b, &mut inputs.up, &mut inputs.down, &mut inputs.left, &mut inputs.right] {
             match button {

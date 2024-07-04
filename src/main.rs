@@ -3,6 +3,7 @@
 
 mod mc_inputs;
 
+use brickbreaker::BrickBreaker;
 use bsp::entry;
 use bsp::hal::{
     clocks::{Clock, init_clocks_and_plls},
@@ -22,6 +23,7 @@ use embedded_hal::digital::v2::OutputPin;
 use embedded_hal::spi::MODE_0;
 use fire::Fire;
 use fugit::RateExtU32;
+use input_test::InputTest;
 use mipidsi::{Builder, Orientation};
 #[allow(unused_imports)]
 use panic_probe as _;
@@ -31,7 +33,7 @@ use waveshare_rp2040_zero as bsp;
 use waveshare_rp2040_zero::{Gp0Spi0Rx, Gp1Spi0Csn, Gp2Spi0Sck, Gp3Spi0Tx};
 use waveshare_rp2040_zero::hal::Timer;
 
-use frugger_core::{ButtonInput, FrugInputs};
+use frugger_core::{ButtonInput, FruggerGame, FrugInputs};
 use crate::mc_inputs::McInputs;
 
 #[entry]
@@ -115,10 +117,10 @@ fn main() -> ! {
     display.clear(Rgb565::CSS_ROYAL_BLUE).unwrap();
 
     // let mut game = BrickBreaker::new();
-    // let mut game = InputTest::new();
-    let mut game = Fire::new();
+    let mut game = InputTest::new();
+    // let mut game = Fire::new();
 
-    let mc_inputs = McInputs::new(left, right, a, b, up, down);
+    let mut mc_inputs = McInputs::new(left, right, a, b, up, down);
     let mut frug_inputs = FrugInputs::default();
 
     const FRAME_TIME: u64 = 1000 / 10;
@@ -128,7 +130,8 @@ fn main() -> ! {
 
         mc_inputs.tick(&mut frug_inputs);
 
-        game.update(&mut display, &frug_inputs);
+        game.update(&frug_inputs);
+        game.frugger().draw_frame(&mut display);
 
         let frame_end = timer.get_counter();
         let frame_elapsed = (frame_end - frame_start).to_millis();
