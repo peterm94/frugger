@@ -14,13 +14,18 @@ use defmt::*;
 #[allow(unused_imports)]
 use defmt_rtt as _f;
 use display_interface_spi::SPIInterfaceNoCS;
+use embedded_graphics::mono_font::ascii::FONT_10X20;
+use embedded_graphics::mono_font::MonoTextStyle;
 use embedded_graphics::pixelcolor::Rgb565;
 use embedded_graphics::prelude::*;
+use embedded_graphics::primitives::{PrimitiveStyle, Rectangle, StyledDrawable};
+use embedded_graphics::text::Text;
 use embedded_hal::digital::v2::OutputPin;
 use embedded_hal::spi::MODE_0;
+use fire::Fire;
 use fugit::RateExtU32;
-use input_test::InputTest;
 use mipidsi::{Builder, Orientation};
+use numtoa::NumToA;
 #[allow(unused_imports)]
 use panic_probe as _;
 // Provide an alias for our BSP so we can switch targets quickly.
@@ -116,13 +121,16 @@ fn main() -> ! {
     display.clear(Rgb565::CSS_ROYAL_BLUE).unwrap();
 
     // let mut game = BrickBreaker::new();
-    let mut game = InputTest::new();
-    // let mut game = Fire::new();
+    // let mut game = InputTest::new();
+    let mut game = Fire::new();
 
     let mut mc_inputs = McInputs::new(a, b, up, down, left, right);
     let mut frug_inputs = FrugInputs::default();
 
     const FRAME_TIME: u64 = 1000 / 10;
+    let mut buf = [0u8; 20];
+
+    let mut logic_avg = RollingAverage::new();
 
     loop {
         let frame_start = timer.get_counter();
@@ -132,10 +140,45 @@ fn main() -> ! {
         game.update(&frug_inputs);
         game.frugger().draw_frame(&mut display);
 
-        let frame_end = timer.get_counter();
-        let frame_elapsed = (frame_end - frame_start).to_millis();
+        let logic_end = timer.get_counter();
+        let frame_elapsed = (logic_end - frame_start).to_millis();
+
+        logic_avg.add(frame_elapsed);
+        let txt_style = MonoTextStyle::new(&FONT_10X20, if logic_avg.average() < FRAME_TIME { Rgb565::WHITE } else { Rgb565::RED });
+        let rect_style = PrimitiveStyle::with_fill(Rgb565::BLACK);
+        let frame_time = logic_avg.average().numtoa_str(10, &mut buf);
+        Rectangle::new(Point::new(30, 10), Size::new_equal(30)).draw_styled(&rect_style, &mut display);
+        let text = Text::new(frame_time, Point::new_equal(30), txt_style);
+        text.draw(&mut display);
+
         if frame_elapsed < FRAME_TIME {
             delay.delay_ms((FRAME_TIME - frame_elapsed) as u32);
         }
+    }
+}
+
+pub struct RollingAverage {
+    window: [u64; 10],
+    index: usize,
+    sum: u64,
+}
+
+impl RollingAverage {
+    pub fn new() -> Self {
+        RollingAverage {
+            window: [0; 10],
+            index: 0,
+            sum: 0,
+        }
+    }
+
+    pub fn add(&mut self, val: u64) {
+        self.sum = self.sum - self.window[self.index] + val;
+        self.window[self.index] = val;
+        self.index = (self.index + 1) % 10;
+    }
+
+    pub fn average(&self) -> u64 {
+        self.sum / 10
     }
 }
