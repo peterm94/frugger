@@ -1,9 +1,6 @@
 #![no_std]
 #![no_main]
 
-mod mc_inputs;
-
-use brickbreaker::BrickBreaker;
 use bsp::entry;
 use bsp::hal::{
     clocks::{Clock, init_clocks_and_plls},
@@ -21,7 +18,6 @@ use embedded_graphics::pixelcolor::Rgb565;
 use embedded_graphics::prelude::*;
 use embedded_hal::digital::v2::OutputPin;
 use embedded_hal::spi::MODE_0;
-use fire::Fire;
 use fugit::RateExtU32;
 use input_test::InputTest;
 use mipidsi::{Builder, Orientation};
@@ -34,7 +30,10 @@ use waveshare_rp2040_zero::{Gp0Spi0Rx, Gp1Spi0Csn, Gp2Spi0Sck, Gp3Spi0Tx};
 use waveshare_rp2040_zero::hal::Timer;
 
 use frugger_core::{ButtonInput, FruggerGame, FrugInputs};
+
 use crate::mc_inputs::McInputs;
+
+mod mc_inputs;
 
 #[entry]
 fn main() -> ! {
@@ -74,20 +73,20 @@ fn main() -> ! {
 
     let mut led_pin = pins.gp5.into_push_pull_output();
 
-    let left_pin = pins.gp7.into_pull_up_input();
+    let left_pin = pins.gp15.into_pull_up_input();
     let left = left_pin.as_input();
-    let right_pin = pins.gp8.into_pull_up_input();
+    let right_pin = pins.gp14.into_pull_up_input();
     let right = right_pin.as_input();
 
     let up_pin = pins.gp27.into_pull_up_input();
-    let up = left_pin.as_input();
+    let up = up_pin.as_input();
     let down_pin = pins.gp26.into_pull_up_input();
-    let down = right_pin.as_input();
+    let down = down_pin.as_input();
 
-    let a_pin = pins.gp15.into_pull_up_input();
-    let a = left_pin.as_input();
-    let b_pin = pins.gp14.into_pull_up_input();
-    let b = right_pin.as_input();
+    let a_pin = pins.gp7.into_pull_up_input();
+    let a = a_pin.as_input();
+    let b_pin = pins.gp8.into_pull_up_input();
+    let b = b_pin.as_input();
 
     // turn on the backlight
     led_pin.set_high().unwrap();
@@ -120,7 +119,7 @@ fn main() -> ! {
     let mut game = InputTest::new();
     // let mut game = Fire::new();
 
-    let mut mc_inputs = McInputs::new(left, right, a, b, up, down);
+    let mut mc_inputs = McInputs::new(a, b, up, down, left, right);
     let mut frug_inputs = FrugInputs::default();
 
     const FRAME_TIME: u64 = 1000 / 10;

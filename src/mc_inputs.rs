@@ -1,4 +1,5 @@
 use embedded_hal::digital::v2::InputPin;
+
 use frugger_core::{ButtonInput, ButtonState, FrugInputs};
 
 pub struct McInputs<A: InputPin, B: InputPin, L: InputPin, R: InputPin, U: InputPin, D: InputPin> {
@@ -9,8 +10,9 @@ pub struct McInputs<A: InputPin, B: InputPin, L: InputPin, R: InputPin, U: Input
     up_pin: U,
     down_pin: D,
 }
+
 impl<A: InputPin, B: InputPin, L: InputPin, R: InputPin, U: InputPin, D: InputPin> McInputs<A, B, L, R, U, D> {
-    pub fn new(a_pin: A, b_pin: B, left_pin: L, right_pin: R, up_pin: U, down_pin: D) -> Self {
+    pub fn new(a_pin: A, b_pin: B, up_pin: U, down_pin: D, left_pin: L, right_pin: R) -> Self {
         Self {
             a_pin,
             b_pin,
@@ -53,5 +55,9 @@ impl<A: InputPin, B: InputPin, L: InputPin, R: InputPin, U: InputPin, D: InputPi
         // update based on this frame
         Self::set_button_state(&self.a_pin, &mut inputs.a);
         Self::set_button_state(&self.b_pin, &mut inputs.b);
+        Self::set_button_state(&self.up_pin, &mut inputs.up);
+        Self::set_button_state(&self.down_pin, &mut inputs.down);
+        Self::set_button_state(&self.left_pin, &mut inputs.left);
+        Self::set_button_state(&self.right_pin, &mut inputs.right);
     }
 }
