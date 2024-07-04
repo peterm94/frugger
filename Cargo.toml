@@ -22,6 +22,8 @@ embedded-graphics = "0.8.1"
 fugit = "0.3.7"
 brickbreaker = { path = "../frugger_games/brickbreaker" }
 fire = { path = "../frugger_games/fire" }
+input_test = { path = "../frugger_games/input_test" }
+frugger_core = { path = "frugger_core" }
 # cargo build/run
 [profile.dev]
 codegen-units = 1

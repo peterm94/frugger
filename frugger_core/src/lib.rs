@@ -9,6 +9,28 @@ use embedded_graphics::pixelcolor::{PixelColor, Rgb565};
 use embedded_graphics::prelude::*;
 use embedded_graphics::primitives::Rectangle;
 
+#[derive(Default, Eq, PartialEq)]
+pub enum ButtonState {
+    PRESSED,
+    RELEASED,
+    DOWN,
+    #[default]
+    UP,
+}
+
+pub trait ButtonInput {
+    fn tick(&mut self, inputs: &mut FrugInputs);
+}
+
+#[derive(Default, Eq, PartialEq)]
+pub struct FrugInputs {
+    pub a: ButtonState,
+    pub b: ButtonState,
+    pub left: ButtonState,
+    pub right: ButtonState,
+    pub up: ButtonState,
+    pub down: ButtonState,
+}
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub enum Palette {
@@ -195,4 +217,9 @@ impl Frugger {
         self.last_frame.copy_from_slice(&self.next_frame);
         self.next_frame.fill(self.default_val);
     }
+}
+
+pub trait FruggerGame {
+    fn update(&mut self, inputs: &FrugInputs);
+    fn frugger(&mut self) -> &mut Frugger;
 }

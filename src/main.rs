@@ -1,7 +1,8 @@
 #![no_std]
 #![no_main]
 
-use brickbreaker::BrickBreaker;
+mod mc_inputs;
+
 use bsp::entry;
 use bsp::hal::{
     clocks::{Clock, init_clocks_and_plls},
@@ -17,7 +18,7 @@ use defmt_rtt as _f;
 use display_interface_spi::SPIInterfaceNoCS;
 use embedded_graphics::pixelcolor::Rgb565;
 use embedded_graphics::prelude::*;
-use embedded_hal::digital::v2::{InputPin, OutputPin};
+use embedded_hal::digital::v2::OutputPin;
 use embedded_hal::spi::MODE_0;
 use fire::Fire;
 use fugit::RateExtU32;
@@ -29,6 +30,9 @@ use panic_probe as _;
 use waveshare_rp2040_zero as bsp;
 use waveshare_rp2040_zero::{Gp0Spi0Rx, Gp1Spi0Csn, Gp2Spi0Sck, Gp3Spi0Tx};
 use waveshare_rp2040_zero::hal::Timer;
+
+use frugger_core::{ButtonInput, FrugInputs};
+use crate::mc_inputs::McInputs;
 
 #[entry]
 fn main() -> ! {
@@ -68,10 +72,20 @@ fn main() -> ! {
 
     let mut led_pin = pins.gp5.into_push_pull_output();
 
-    let left_pin = pins.gp14.into_pull_up_input();
+    let left_pin = pins.gp7.into_pull_up_input();
     let left = left_pin.as_input();
-    let right_pin = pins.gp15.into_pull_up_input();
+    let right_pin = pins.gp8.into_pull_up_input();
     let right = right_pin.as_input();
+
+    let up_pin = pins.gp27.into_pull_up_input();
+    let up = left_pin.as_input();
+    let down_pin = pins.gp26.into_pull_up_input();
+    let down = right_pin.as_input();
+
+    let a_pin = pins.gp15.into_pull_up_input();
+    let a = left_pin.as_input();
+    let b_pin = pins.gp14.into_pull_up_input();
+    let b = right_pin.as_input();
 
     // turn on the backlight
     led_pin.set_high().unwrap();
@@ -101,22 +115,20 @@ fn main() -> ! {
     display.clear(Rgb565::CSS_ROYAL_BLUE).unwrap();
 
     // let mut game = BrickBreaker::new();
+    // let mut game = InputTest::new();
     let mut game = Fire::new();
 
-    const FRAME_TIME: u64 = 1000 / 60;
+    let mc_inputs = McInputs::new(left, right, a, b, up, down);
+    let mut frug_inputs = FrugInputs::default();
+
+    const FRAME_TIME: u64 = 1000 / 10;
 
     loop {
         let frame_start = timer.get_counter();
 
-        if left.is_high().unwrap() {
-            game.input = -1;
-        } else if right.is_high().unwrap() {
-            game.input = 1;
-        } else {
-            game.input = 0;
-        }
+        mc_inputs.tick(&mut frug_inputs);
 
-        game.update(&mut display);
+        game.update(&mut display, &frug_inputs);
 
         let frame_end = timer.get_counter();
         let frame_elapsed = (frame_end - frame_start).to_millis();
