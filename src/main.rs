@@ -28,11 +28,16 @@ use mipidsi::{Builder, Orientation};
 use numtoa::NumToA;
 #[allow(unused_imports)]
 use panic_probe as _;
+use usb_device::class_prelude::UsbBusAllocator;
+use usb_device::prelude::{StringDescriptors, UsbDeviceBuilder, UsbVidPid};
+use usbd_serial::{SerialPort, USB_CLASS_CDC};
+use usbd_serial::embedded_io::Write;
 // Provide an alias for our BSP so we can switch targets quickly.
 // Uncomment the BSP you included in Cargo.toml, the rest of the code does not need to change.
 use waveshare_rp2040_zero as bsp;
 use waveshare_rp2040_zero::{Gp0Spi0Rx, Gp1Spi0Csn, Gp2Spi0Sck, Gp3Spi0Tx};
 use waveshare_rp2040_zero::hal::Timer;
+use waveshare_rp2040_zero::hal::usb::UsbBus;
 
 use frugger_core::{ButtonInput, FruggerGame, FrugInputs};
 
@@ -75,6 +80,18 @@ fn main() -> ! {
         &mut pac.RESETS,
     );
 
+    let usb_bus = UsbBusAllocator::new(UsbBus::new(pac.USBCTRL_REGS,
+                                                   pac.USBCTRL_DPRAM, clocks.usb_clock, true, &mut pac.RESETS));
+
+    let mut serial = SerialPort::new(&usb_bus);
+
+    let mut usb_device = UsbDeviceBuilder::new(&usb_bus, UsbVidPid(0x2E8A, 0x000A))
+        .strings(&[StringDescriptors::default()
+            .manufacturer("Frugger")
+            .product("Serial Port")
+            .serial_number("TEST")]).unwrap()
+        .device_class(USB_CLASS_CDC)
+        .build();
 
     let mut led_pin = pins.gp5.into_push_pull_output();
 
@@ -151,10 +168,22 @@ fn main() -> ! {
         let text = Text::new(frame_time, Point::new_equal(30), txt_style);
         text.draw(&mut display);
 
-        if frame_elapsed < FRAME_TIME {
-            delay.delay_ms((FRAME_TIME - frame_elapsed) as u32);
-        }
+        log("hello", &mut serial);
+        usb_device.poll(&mut [&mut serial]);
+
+        // if frame_elapsed < FRAME_TIME {
+        //     delay.delay_ms((FRAME_TIME - frame_elapsed) as u32);
+        // }
     }
+}
+
+fn log(msg: &str, serial: &mut SerialPort<UsbBus>) {
+    let _ = serial.write(msg.as_bytes());
+    let _ = serial.write("\r\n".as_bytes());
+}
+
+fn log_fmt(msg:&str, serial: &mut SerialPort<UsbBus>) {
+    serial.write_fmt(format_args!("{}", msg));
 }
 
 pub struct RollingAverage {

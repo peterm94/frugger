@@ -25,6 +25,9 @@ brickbreaker = { path = "../frugger_games/brickbreaker" }
 fire = { path = "../frugger_games/fire" }
 input_test = { path = "../frugger_games/input_test" }
 frugger_core = { path = "frugger_core" }
+usb-device = "0.3.2"
+usbd-serial = "0.2.2"
+usbd-hid = "0.7.0"
 # cargo build/run
 [profile.dev]
 codegen-units = 1
