@@ -8,16 +8,21 @@ license = "MIT OR Apache-2.0"
 cortex-m = "0.7"
 cortex-m-rt = "0.7"
 heapless = "0.8.0"
-embedded-hal = "0.2.7"
+embedded-hal = "1.0.0"
+
+# TODO update to 0.3.0 when it is released, remove portable-atomic
+embedded-hal-bus = "0.2.0"
+portable-atomic = { version = "1.6.0", features = ["critical-section"] }
 
 defmt = "0.3"
 defmt-rtt = "0.4"
 panic-probe = { version = "0.3", features = ["print-defmt"] }
 
 waveshare-rp2040-zero = "0.8.0"
-mipidsi = { path = "../mipidsi" }
-display-interface-spi = "0.4.1"
-display-interface = "0.4.1"
+mipidsi = "0.8.0"
+dummy-pin = "1.0.0"
+display-interface-spi = "0.5.0"
+display-interface = "0.5.0"
 embedded-graphics = "0.8.1"
 fugit = "0.3.7"
 numtoa = "0.2.4"
@@ -59,7 +64,7 @@ overflow-checks = false
 codegen-units = 8
 debug = false
 debug-assertions = false
-opt-level = 0
+opt-level = 3
 overflow-checks = false
 
 # cargo test

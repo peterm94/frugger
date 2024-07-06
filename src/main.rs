@@ -18,18 +18,21 @@ use defmt::*;
 use defmt::*;
 #[allow(unused_imports)]
 use defmt_rtt as _f;
-use display_interface_spi::SPIInterfaceNoCS;
+use display_interface_spi::SPIInterface;
 use embedded_graphics::mono_font::ascii::FONT_10X20;
 use embedded_graphics::mono_font::MonoTextStyle;
 use embedded_graphics::pixelcolor::Rgb565;
 use embedded_graphics::prelude::*;
 use embedded_graphics::primitives::{PrimitiveStyle, Rectangle, StyledDrawable};
 use embedded_graphics::text::Text;
-use embedded_hal::digital::v2::OutputPin;
+use embedded_hal::delay::DelayNs;
+use embedded_hal::digital::OutputPin;
 use embedded_hal::spi::MODE_0;
+use embedded_hal_bus::spi::ExclusiveDevice;
 use fire::Fire;
 use fugit::{MicrosDurationU32, RateExtU32};
-use mipidsi::{Builder, Orientation};
+use mipidsi::{Builder, models};
+use mipidsi::options::{Orientation, Rotation};
 use numtoa::NumToA;
 #[allow(unused_imports)]
 use panic_probe as _;
@@ -40,7 +43,8 @@ use usbd_serial::embedded_io::Write;
 // Provide an alias for our BSP so we can switch targets quickly.
 // Uncomment the BSP you included in Cargo.toml, the rest of the code does not need to change.
 use waveshare_rp2040_zero as bsp;
-use waveshare_rp2040_zero::{Gp0Spi0Rx, Gp1Spi0Csn, Gp2Spi0Sck, Gp3Spi0Tx, XOSC_CRYSTAL_FREQ};
+use waveshare_rp2040_zero::{hal, XOSC_CRYSTAL_FREQ};
+use waveshare_rp2040_zero::hal::spi::{SpiDevice, State, ValidSpiPinout};
 use waveshare_rp2040_zero::hal::Timer;
 use waveshare_rp2040_zero::hal::timer::{Alarm, Alarm0};
 use waveshare_rp2040_zero::hal::usb::UsbBus;
@@ -156,24 +160,29 @@ fn main() -> ! {
 
     let dc = pins.gp4.into_push_pull_output();
 
-    let rx: Gp0Spi0Rx = pins.gp0.reconfigure();
-    let tx: Gp3Spi0Tx = pins.gp3.reconfigure();
-    let _cs: Gp1Spi0Csn = pins.gp1.reconfigure();
-    let sck: Gp2Spi0Sck = pins.gp2.reconfigure();
+    let rx = pins.gp0.into_function::<hal::gpio::FunctionSpi>();
+    let tx = pins.gp3.into_function::<hal::gpio::FunctionSpi>();
+    let cs = pins.gp1.into_push_pull_output();
+    let sck = pins.gp2.into_function::<hal::gpio::FunctionSpi>();
 
+    // let dummy_cs = dummy_pin::DummyPin::new_low();
     let spi: bsp::hal::spi::Spi::<_, _, _, 8> = bsp::hal::spi::Spi::new(pac.SPI0, (tx, rx, sck));
     let spi = spi.init(&mut pac.RESETS, clocks.peripheral_clock.freq(), 20.MHz(), MODE_0);
+    let mut spi_timer = timer.clone();
+    let spi_bus = ExclusiveDevice::new(spi, cs, &mut spi_timer).unwrap();
+    let di = SPIInterface::new(spi_bus, dc);
 
-    let di = SPIInterfaceNoCS::new(spi, dc);
+    let mut display_timer = timer.clone();
 
-    let mut display = Builder::ili9341_rgb565(di)
-        .with_display_size(320, 240)
-        .with_orientation(Orientation::Landscape(true))
-        .init(&mut delay, Some(rst)).unwrap();
+    let mut display = Builder::new(models::ILI9341Rgb565, di)
+        .display_size(240, 320)
+        .orientation(Orientation { rotation: Rotation::Deg90, mirrored: false })
+        .reset_pin(rst)
+        .init(&mut display_timer).unwrap();
 
-    delay.delay_ms(10);
 
     display.clear(Rgb565::CSS_ROYAL_BLUE).unwrap();
+
 
     // let mut game = BrickBreaker::new();
     // let mut game = InputTest::new();
@@ -186,6 +195,7 @@ fn main() -> ! {
     let mut buf = [0u8; 20];
 
     let mut logic_avg = RollingAverage::new();
+    let mut draw_avg = RollingAverage::new();
 
     loop {
         let frame_start = timer.get_counter();
@@ -193,12 +203,15 @@ fn main() -> ! {
         mc_inputs.tick(&mut frug_inputs);
 
         game.update(&frug_inputs);
-        game.frugger().draw_frame(&mut display);
 
         let logic_end = timer.get_counter();
         let frame_elapsed = (logic_end - frame_start).to_millis();
 
         logic_avg.add(frame_elapsed);
+        log!("Logic time: {}", logic_avg.average());
+
+        game.frugger().draw_frame(&mut display);
+
         let txt_style = MonoTextStyle::new(&FONT_10X20, if logic_avg.average() < FRAME_TIME { Rgb565::WHITE } else { Rgb565::RED });
         let rect_style = PrimitiveStyle::with_fill(Rgb565::BLACK);
         let frame_time = logic_avg.average().numtoa_str(10, &mut buf);
@@ -206,15 +219,17 @@ fn main() -> ! {
         let text = Text::new(frame_time, Point::new_equal(30), txt_style);
         text.draw(&mut display);
 
-        // log("hello");
-        // log_fmt(format_args!("{}", frame_time));
-        log!("{frame_time}");
+        let draw_end = timer.get_counter();
+        let draw_time = (draw_end - logic_end).to_millis();
+        draw_avg.add(draw_time);
+        log!("Draw time: {}", draw_avg.average());
 
         if frame_elapsed < FRAME_TIME {
-            delay.delay_ms((FRAME_TIME - frame_elapsed) as u32);
+            timer.delay_ms((FRAME_TIME - frame_elapsed) as u32);
         }
     }
 }
+
 fn log_fmt(fmt: fmt::Arguments<'_>) {
     unsafe {
         cortex_m::interrupt::free(|cs| {

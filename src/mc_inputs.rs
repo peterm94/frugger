@@ -1,4 +1,4 @@
-use embedded_hal::digital::v2::InputPin;
+use embedded_hal::digital::InputPin;
 
 use frugger_core::{ButtonInput, ButtonState, FrugInputs};
 
@@ -23,7 +23,7 @@ impl<A: InputPin, B: InputPin, L: InputPin, R: InputPin, U: InputPin, D: InputPi
         }
     }
 
-    fn set_button_state<P: InputPin>(pin: &P, button: &mut ButtonState) {
+    fn set_button_state<P: InputPin>(pin: &mut P, button: &mut ButtonState) {
 
         // Active
         if pin.is_low().ok().unwrap() {
@@ -53,11 +53,11 @@ impl<A: InputPin, B: InputPin, L: InputPin, R: InputPin, U: InputPin, D: InputPi
             }
         }
         // update based on this frame
-        Self::set_button_state(&self.a_pin, &mut inputs.a);
-        Self::set_button_state(&self.b_pin, &mut inputs.b);
-        Self::set_button_state(&self.up_pin, &mut inputs.up);
-        Self::set_button_state(&self.down_pin, &mut inputs.down);
-        Self::set_button_state(&self.left_pin, &mut inputs.left);
-        Self::set_button_state(&self.right_pin, &mut inputs.right);
+        Self::set_button_state(&mut self.a_pin, &mut inputs.a);
+        Self::set_button_state(&mut self.b_pin, &mut inputs.b);
+        Self::set_button_state(&mut self.up_pin, &mut inputs.up);
+        Self::set_button_state(&mut self.down_pin, &mut inputs.down);
+        Self::set_button_state(&mut self.left_pin, &mut inputs.left);
+        Self::set_button_state(&mut self.right_pin, &mut inputs.right);
     }
 }
