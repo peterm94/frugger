@@ -3,6 +3,7 @@
 
 use core::cell::RefCell;
 use core::fmt;
+use brickbreaker::BrickBreaker;
 
 use bsp::entry;
 use bsp::hal::{
@@ -31,6 +32,7 @@ use embedded_hal::spi::MODE_0;
 use embedded_hal_bus::spi::ExclusiveDevice;
 use fire::Fire;
 use fugit::{MicrosDurationU32, RateExtU32};
+use input_test::InputTest;
 use mipidsi::{Builder, models};
 use mipidsi::options::{Orientation, Rotation};
 use numtoa::NumToA;
@@ -185,17 +187,16 @@ fn main() -> ! {
 
 
     // let mut game = BrickBreaker::new();
-    // let mut game = InputTest::new();
-    let mut game = Fire::new();
+    let mut game = InputTest::new();
+    // let mut game = Fire::new();
+    let target_fps = 1000 / InputTest::TARGET_FPS;
 
     let mut mc_inputs = McInputs::new(a, b, up, down, left, right);
     let mut frug_inputs = FrugInputs::default();
 
-    const FRAME_TIME: u64 = 1000 / 10;
     let mut buf = [0u8; 20];
 
     let mut logic_avg = RollingAverage::new();
-    let mut draw_avg = RollingAverage::new();
 
     loop {
         let frame_start = timer.get_counter();
@@ -205,27 +206,26 @@ fn main() -> ! {
         game.update(&frug_inputs);
 
         let logic_end = timer.get_counter();
-        let frame_elapsed = (logic_end - frame_start).to_millis();
+        let logic_time = (logic_end - frame_start).to_millis();
 
-        logic_avg.add(frame_elapsed);
-        log!("Logic time: {}", logic_avg.average());
+        logic_avg.add(logic_time);
 
         game.frugger().draw_frame(&mut display);
 
-        let txt_style = MonoTextStyle::new(&FONT_10X20, if logic_avg.average() < FRAME_TIME { Rgb565::WHITE } else { Rgb565::RED });
-        let rect_style = PrimitiveStyle::with_fill(Rgb565::BLACK);
-        let frame_time = logic_avg.average().numtoa_str(10, &mut buf);
-        Rectangle::new(Point::new(30, 10), Size::new_equal(30)).draw_styled(&rect_style, &mut display);
-        let text = Text::new(frame_time, Point::new_equal(30), txt_style);
-        text.draw(&mut display);
-
         let draw_end = timer.get_counter();
         let draw_time = (draw_end - logic_end).to_millis();
-        draw_avg.add(draw_time);
-        log!("Draw time: {}", draw_avg.average());
+        let total_time = (draw_end - frame_start).to_millis();
+        log!("Logic: {logic_time} Draw: {draw_time}, Total: {total_time} / {target_fps}");
 
-        if frame_elapsed < FRAME_TIME {
-            timer.delay_ms((FRAME_TIME - frame_elapsed) as u32);
+        let txt_style = MonoTextStyle::new(&FONT_10X20, if total_time < target_fps { Rgb565::WHITE } else { Rgb565::RED });
+        let rect_style = PrimitiveStyle::with_fill(Rgb565::BLACK);
+        let frame_time = total_time.numtoa_str(10, &mut buf);
+        Rectangle::new(Point::new(0, 0), Size::new(30, 20)).draw_styled(&rect_style, &mut display);
+        let text = Text::new(frame_time, Point::new(0, 15), txt_style);
+        text.draw(&mut display);
+
+        if logic_time < target_fps {
+            timer.delay_ms((target_fps - logic_time) as u32);
         }
     }
 }

@@ -18,6 +18,28 @@ pub enum ButtonState {
     UP,
 }
 
+impl ButtonState {
+    /// Already down or pressed this frame.
+    pub fn down(&self) -> bool {
+        self == &ButtonState::PRESSED || self == &ButtonState::DOWN
+    }
+
+    /// Already up or released this frame.
+    pub fn up(&self) -> bool {
+        self == &ButtonState::UP || self == &ButtonState::RELEASED
+    }
+
+    /// Pressed this frame.
+    pub fn pressed(&self) -> bool {
+        self == &ButtonState::PRESSED
+    }
+
+    /// Release this frame.
+    pub fn released(&self) -> bool {
+        self == &ButtonState::RELEASED
+    }
+}
+
 pub trait ButtonInput {
     fn tick(&mut self, inputs: &mut FrugInputs);
 }
@@ -184,7 +206,6 @@ impl Frugger {
 
     // TODO this needs to all change. the looping is super slow.
     pub fn draw_frame<T>(&mut self, display: &mut T) where T: DrawTarget<Color=Rgb565> {
-
         let mut cols = [Rgb565::BLACK; 320];
 
         // iterate over rows and draw continuous segments
@@ -222,6 +243,7 @@ impl Frugger {
 }
 
 pub trait FruggerGame {
+    const TARGET_FPS: u64;
     fn update(&mut self, inputs: &FrugInputs);
     fn frugger(&mut self) -> &mut Frugger;
 }
