@@ -74,25 +74,44 @@ pub enum Palette {
     BlueGrey,
 }
 
+impl Palette {
+    const BlackC: Rgb565 = Rgb565::new(3, 7, 5);
+    const PurpleC: Rgb565 = Rgb565::new(11, 10, 11);
+    const RedC: Rgb565 = Rgb565::new(22, 15, 10);
+    const OrangeC: Rgb565 = Rgb565::new(29, 31, 11);
+    const YellowC: Rgb565 = Rgb565::new(31, 51, 14);
+    const LimeC: Rgb565 = Rgb565::new(20, 59, 14);
+    const GreenC: Rgb565 = Rgb565::new(7, 45, 12);
+    const TealC: Rgb565 = Rgb565::new(4, 28, 15);
+    const NavyBlueC: Rgb565 = Rgb565::new(5, 13, 13);
+    const DarkBlueC: Rgb565 = Rgb565::new(7, 23, 24);
+    const BlueC: Rgb565 = Rgb565::new(8, 41, 30);
+    const LightBlueC: Rgb565 = Rgb565::new(14, 59, 30);
+    const WhiteC: Rgb565 = Rgb565::new(30, 60, 30);
+    const LightGreyC: Rgb565 = Rgb565::new(18, 43, 24);
+    const DarkGreyC: Rgb565 = Rgb565::new(10, 27, 16);
+    const BlueGreyC: Rgb565 = Rgb565::new(6, 15, 11);
+}
+
 impl Into<Rgb565> for Palette {
     fn into(self) -> Rgb565 {
         match self {
-            Palette::Black => Rgb565::new(3, 7, 5),
-            Palette::Purple => Rgb565::new(11, 10, 11),
-            Palette::Red => Rgb565::new(22, 15, 10),
-            Palette::Orange => Rgb565::new(29, 31, 11),
-            Palette::Yellow => Rgb565::new(31, 51, 14),
-            Palette::Lime => Rgb565::new(20, 59, 14),
-            Palette::Green => Rgb565::new(7, 45, 12),
-            Palette::Teal => Rgb565::new(4, 28, 15),
-            Palette::NavyBlue => Rgb565::new(5, 13, 13),
-            Palette::DarkBlue => Rgb565::new(7, 23, 24),
-            Palette::Blue => Rgb565::new(8, 41, 30),
-            Palette::LightBlue => Rgb565::new(14, 59, 30),
-            Palette::White => Rgb565::new(30, 60, 30),
-            Palette::LightGrey => Rgb565::new(18, 43, 24),
-            Palette::DarkGrey => Rgb565::new(10, 27, 16),
-            Palette::BlueGrey => Rgb565::new(6, 15, 11)
+            Palette::Black => Self::BlackC,
+            Palette::Purple => Self::PurpleC,
+            Palette::Red => Self::RedC,
+            Palette::Orange => Self::OrangeC,
+            Palette::Yellow => Self::YellowC,
+            Palette::Lime => Self::LimeC,
+            Palette::Green => Self::GreenC,
+            Palette::Teal => Self::TealC,
+            Palette::NavyBlue => Self::NavyBlueC,
+            Palette::DarkBlue => Self::DarkBlueC,
+            Palette::Blue => Self::BlueC,
+            Palette::LightBlue => Self::LightBlueC,
+            Palette::White => Self::WhiteC,
+            Palette::LightGrey => Self::LightGreyC,
+            Palette::DarkGrey => Self::DarkGreyC,
+            Palette::BlueGrey => Self::BlueGreyC,
         }
     }
 }
@@ -132,8 +151,7 @@ impl PixelColor for Palette {
 pub struct Frugger {
     // 320 * 240 / 2
     default_val: u8,
-    last_frame: [u8; 38400],
-    next_frame: [u8; 38400],
+    frame_data: [u8; 76800],
 }
 
 impl Dimensions for Frugger {
@@ -159,37 +177,36 @@ impl Frugger {
         let default_val = bg_col.bits() | (bg_col.bits() << 4);
         Self {
             default_val,
-            last_frame: [u8::MAX; 38400],
-            next_frame: [default_val; 38400],
+            frame_data: [u8::MAX; 76800],
         }
     }
-    fn get_pixel_value(&self, x: u16, y: u16) -> Palette {
-        let pixel_offset = (y as u32 * 320 + x as u32) as usize;
-
-        // If it's even, we can half it and read the first 4 bits of the byte at the index
-        let colour = if pixel_offset % 2 == 0 {
-            self.last_frame[pixel_offset / 2] & 0x0F
-        } else {
-            // Odd number, we have to read bits 5-8
-            self.last_frame[pixel_offset / 2] >> 4
-        };
-
-        Palette::from_index(&colour).unwrap()
-    }
-
-    fn get_pixel_value_next(&self, x: u16, y: u16) -> Palette {
-        let pixel_offset = (y as u32 * 320 + x as u32) as usize;
-
-        // If it's even, we can half it and read the first 4 bits of the byte at the index
-        let colour = if pixel_offset % 2 == 0 {
-            self.next_frame[pixel_offset / 2] & 0x0F
-        } else {
-            // Odd number, we have to read bits 5-8
-            self.next_frame[pixel_offset / 2] >> 4
-        };
-
-        Palette::from_index(&colour).unwrap()
-    }
+    // fn get_pixel_value(&self, x: u16, y: u16) -> Palette {
+    //     let pixel_offset = (y as u32 * 320 + x as u32) as usize;
+    //
+    //     // If it's even, we can half it and read the first 4 bits of the byte at the index
+    //     let colour = if pixel_offset % 2 == 0 {
+    //         self.last_frame[pixel_offset / 2] & 0x0F
+    //     } else {
+    //         // Odd number, we have to read bits 5-8
+    //         self.last_frame[pixel_offset / 2] >> 4
+    //     };
+    //
+    //     Palette::from_index(&colour).unwrap()
+    // }
+    //
+    // fn get_pixel_value_next(&self, x: u16, y: u16) -> Palette {
+    //     let pixel_offset = (y as u32 * 320 + x as u32) as usize;
+    //
+    //     // If it's even, we can half it and read the first 4 bits of the byte at the index
+    //     let colour = if pixel_offset % 2 == 0 {
+    //         self.next_frame[pixel_offset / 2] & 0x0F
+    //     } else {
+    //         // Odd number, we have to read bits 5-8
+    //         self.next_frame[pixel_offset / 2] >> 4
+    //     };
+    //
+    //     Palette::from_index(&colour).unwrap()
+    // }
 
     fn write_pixel_value(&mut self, x: u16, y: u16, colour: Palette) {
         if x >= 320 || y >= 240 { return; }
@@ -197,30 +214,29 @@ impl Frugger {
         let pixel_offset = (y as u32 * 320 + x as u32) as usize;
         let value = colour.bits() & 0x0F;
 
-        if pixel_offset % 2 == 0 {
-            self.next_frame[pixel_offset / 2] = (self.next_frame[pixel_offset / 2] & 0xF0) | value;
-        } else {
-            self.next_frame[pixel_offset / 2] = (self.next_frame[pixel_offset / 2] & 0x0F) | (value << 4);
-        }
+        // write next to low
+        self.frame_data[pixel_offset] = (self.frame_data[pixel_offset] & 0xF0) | value
     }
 
     // TODO this needs to all change. the looping is super slow.
+    // https://github.com/alloncm/MagenBoy/blob/master/rpi/src/drivers/ili9341_gfx_device.rs#L12
+    // have a look at this, maybe we do DMA and implement it ourselves
+    // todo figure out if our orientation the correct scan direction
     pub fn draw_frame<T>(&mut self, display: &mut T) where T: DrawTarget<Color=Rgb565> {
+        // save 1ms by storing this on frugger
         let mut cols = [Rgb565::BLACK; 320];
 
-        // iterate over rows and draw continuous segments
-        // todo we can cut the screen into a grid?
-        // todo make sure the draw direction is the one we actually want for the display
         for y in 0..240 {
             let mut run_start: i32 = -1;
             let mut run_length = 0;
             for x in 0..320 {
-                let next = self.get_pixel_value_next(x, y);
-                let last = self.get_pixel_value(x, y);
+                let mut px = &mut self.frame_data[y * 320 + x];
+                let next = *px & 0x0F;
+                let last = *px >> 4;
 
                 if next != last {
                     if run_start == -1 { run_start = x as _; }
-                    cols[run_length] = next.into();
+                    cols[run_length] =  Palette::from_index(&next).unwrap().into();
                     run_length += 1;
                 } else if run_start != -1 && (next == last) {
                     let area = Rectangle::new(Point::new(run_start, y as _), Size::new(run_length as _, 1));
@@ -234,11 +250,13 @@ impl Frugger {
                     let area = Rectangle::new(Point::new(run_start, y as _), Size::new(run_length as _, 1));
                     display.fill_contiguous(&area, cols);
                 }
+
+                *px = last << 4| self.default_val;
             }
         }
 
-        self.last_frame.copy_from_slice(&self.next_frame);
-        self.next_frame.fill(self.default_val);
+        // self.last_frame = self.next_frame;
+        // self.next_frame.fill(self.default_val);
     }
 }
 

@@ -3,8 +3,8 @@
 
 use core::cell::RefCell;
 use core::fmt;
-use brickbreaker::BrickBreaker;
 
+use brickbreaker::BrickBreaker;
 use bsp::entry;
 use bsp::hal::{
     clocks::{Clock, init_clocks_and_plls},
@@ -28,11 +28,9 @@ use embedded_graphics::primitives::{PrimitiveStyle, Rectangle, StyledDrawable};
 use embedded_graphics::text::Text;
 use embedded_hal::delay::DelayNs;
 use embedded_hal::digital::OutputPin;
-use embedded_hal::spi::MODE_0;
+use embedded_hal::spi::{MODE_0, SpiBus};
 use embedded_hal_bus::spi::ExclusiveDevice;
-use fire::Fire;
 use fugit::{MicrosDurationU32, RateExtU32};
-use input_test::InputTest;
 use mipidsi::{Builder, models};
 use mipidsi::options::{Orientation, Rotation};
 use numtoa::NumToA;
@@ -48,13 +46,14 @@ use waveshare_rp2040_zero as bsp;
 use waveshare_rp2040_zero::{hal, XOSC_CRYSTAL_FREQ};
 use waveshare_rp2040_zero::hal::spi::{SpiDevice, State, ValidSpiPinout};
 use waveshare_rp2040_zero::hal::Timer;
-use waveshare_rp2040_zero::hal::timer::{Alarm, Alarm0};
+use waveshare_rp2040_zero::hal::timer::{Alarm, Alarm0, Instant};
 use waveshare_rp2040_zero::hal::usb::UsbBus;
 use waveshare_rp2040_zero::pac::interrupt;
 use waveshare_rp2040_zero::pac::Interrupt::TIMER_IRQ_0;
 
 use frugger_core::{ButtonInput, FruggerGame, FrugInputs};
 
+use crate::driver::Driver;
 use crate::mc_inputs::McInputs;
 
 mod mc_inputs;
@@ -67,9 +66,11 @@ static mut ALARM_0: Option<Mutex<RefCell<Alarm0>>> = None;
 
 macro_rules! log {
     ($($tts:tt)*) => {
-        log_fmt(format_args!($($tts)*))
+        crate::log_fmt(format_args!($($tts)*))
     }
 }
+mod driver;
+mod ili;
 
 
 #[entry]
@@ -166,15 +167,55 @@ fn main() -> ! {
     let tx = pins.gp3.into_function::<hal::gpio::FunctionSpi>();
     let cs = pins.gp1.into_push_pull_output();
     let sck = pins.gp2.into_function::<hal::gpio::FunctionSpi>();
+    timer.delay_ms(1000);
 
     // let dummy_cs = dummy_pin::DummyPin::new_low();
     let spi: bsp::hal::spi::Spi::<_, _, _, 8> = bsp::hal::spi::Spi::new(pac.SPI0, (tx, rx, sck));
-    let spi = spi.init(&mut pac.RESETS, clocks.peripheral_clock.freq(), 20.MHz(), MODE_0);
+    let mut spi = spi.init(&mut pac.RESETS, clocks.peripheral_clock.freq(), 500.MHz(), MODE_0);
+    let baud = spi.set_baudrate(clocks.peripheral_clock.freq(), 500.MHz());
+    log!("Actual baudrate is {baud}");
     let mut spi_timer = timer.clone();
+
     let spi_bus = ExclusiveDevice::new(spi, cs, &mut spi_timer).unwrap();
-    let di = SPIInterface::new(spi_bus, dc);
 
     let mut display_timer = timer.clone();
+
+    let di = SPIInterface::new(spi_bus, dc);
+
+    //
+    // let mut driver = Ili9341::new(di, rst, &mut display_timer, ili::Orientation::LandscapeFlipped, DisplaySize240x320).unwrap();
+    //
+    // driver.clear_screen(0x780F);
+    // driver.normal_mode_frame_rate(FrameRateClockDivision::Fosc, FrameRate::FrameRate119);
+    //
+    // let d = [0x780F; 19200];
+    // loop {
+    //     let frame_start = timer.get_counter();
+    //     driver.draw_raw_slice(0, 0, 159, 119, &d);
+    //
+    //     let draw_end = timer.get_counter();
+    //     let draw_time = (draw_end - frame_start).to_millis();
+    //     log!("{draw_time}");
+    // }
+
+    let mut driver = Driver::new(di, rst, display_timer);
+    driver.init2();
+
+    let color = core::iter::repeat(0x780F).take(240 * 320);
+
+    let mut bench = Bencher::new(timer);
+
+    driver.draw_raw_iter(0, 0, 320, 240, color);
+
+    bench.cp("default");
+
+    driver.orient(Orientation::)
+
+    loop {
+        log!("I'm alive");
+        timer.delay_ms(1000);
+    }
+
 
     let mut display = Builder::new(models::ILI9341Rgb565, di)
         .display_size(240, 320)
@@ -186,10 +227,10 @@ fn main() -> ! {
     display.clear(Rgb565::CSS_ROYAL_BLUE).unwrap();
 
 
-    // let mut game = BrickBreaker::new();
-    let mut game = InputTest::new();
+    let mut game = BrickBreaker::new();
+    // let mut game = InputTest::new();
     // let mut game = Fire::new();
-    let target_fps = 1000 / InputTest::TARGET_FPS;
+    let target_fps = 1000 / BrickBreaker::TARGET_FPS;
 
     let mut mc_inputs = McInputs::new(a, b, up, down, left, right);
     let mut frug_inputs = FrugInputs::default();
@@ -230,7 +271,7 @@ fn main() -> ! {
     }
 }
 
-fn log_fmt(fmt: fmt::Arguments<'_>) {
+pub fn log_fmt(fmt: fmt::Arguments<'_>) {
     unsafe {
         cortex_m::interrupt::free(|cs| {
             let serial = USB_SERIAL.borrow(&cs);
@@ -247,6 +288,28 @@ pub struct RollingAverage {
     window: [u64; 10],
     index: usize,
     sum: u64,
+}
+
+struct Bencher {
+    timer: Timer,
+    last: Instant,
+}
+
+impl Bencher {
+    fn new(timer: Timer) -> Self {
+        Self { timer, last: timer.get_counter() }
+    }
+
+    fn start(&mut self) {
+        self.last = self.timer.get_counter();
+    }
+
+    fn cp(&mut self, msg: &str) {
+        let end = self.timer.get_counter();
+        let time = (end - self.last).to_millis();
+        log!("{msg}: {time}ms");
+        self.last = self.timer.get_counter();
+    }
 }
 
 impl RollingAverage {
