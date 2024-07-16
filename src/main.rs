@@ -31,8 +31,6 @@ use embedded_hal::digital::OutputPin;
 use embedded_hal::spi::{MODE_0, SpiBus};
 use embedded_hal_bus::spi::ExclusiveDevice;
 use fugit::{MicrosDurationU32, RateExtU32};
-use mipidsi::{Builder, models};
-use mipidsi::options::{Orientation, Rotation};
 use numtoa::NumToA;
 #[allow(unused_imports)]
 use panic_probe as _;
@@ -53,7 +51,7 @@ use waveshare_rp2040_zero::pac::Interrupt::TIMER_IRQ_0;
 
 use frugger_core::{ButtonInput, FruggerGame, FrugInputs};
 
-use crate::driver::Driver;
+use crate::driver::{Driver, Orientation};
 use crate::mc_inputs::McInputs;
 
 mod mc_inputs;
@@ -172,7 +170,7 @@ fn main() -> ! {
     // let dummy_cs = dummy_pin::DummyPin::new_low();
     let spi: bsp::hal::spi::Spi::<_, _, _, 8> = bsp::hal::spi::Spi::new(pac.SPI0, (tx, rx, sck));
     let mut spi = spi.init(&mut pac.RESETS, clocks.peripheral_clock.freq(), 500.MHz(), MODE_0);
-    let baud = spi.set_baudrate(clocks.peripheral_clock.freq(), 500.MHz());
+    let baud = spi.set_baudrate(clocks.peripheral_clock.freq(), 63.MHz());
     log!("Actual baudrate is {baud}");
     let mut spi_timer = timer.clone();
 
@@ -182,49 +180,36 @@ fn main() -> ! {
 
     let di = SPIInterface::new(spi_bus, dc);
 
-    //
-    // let mut driver = Ili9341::new(di, rst, &mut display_timer, ili::Orientation::LandscapeFlipped, DisplaySize240x320).unwrap();
-    //
-    // driver.clear_screen(0x780F);
-    // driver.normal_mode_frame_rate(FrameRateClockDivision::Fosc, FrameRate::FrameRate119);
-    //
-    // let d = [0x780F; 19200];
-    // loop {
-    //     let frame_start = timer.get_counter();
-    //     driver.draw_raw_slice(0, 0, 159, 119, &d);
-    //
-    //     let draw_end = timer.get_counter();
-    //     let draw_time = (draw_end - frame_start).to_millis();
-    //     log!("{draw_time}");
-    // }
 
     let mut driver = Driver::new(di, rst, display_timer);
-    driver.init2();
+    driver.init_tft_espi();
 
-    let color = core::iter::repeat(0x780F).take(240 * 320);
+
 
     let mut bench = Bencher::new(timer);
 
+    driver.orient(Orientation::Landscape);
+    let color = core::iter::repeat(0x580F).take(240 * 320);
+    bench.start();
     driver.draw_raw_iter(0, 0, 320, 240, color);
+    bench.cp("Landscape");
+    driver.orient(Orientation::LandscapeFlipped);
+    let color = core::iter::repeat(0x786A).take(240 * 320);
+    bench.start();
+    driver.draw_raw_iter(0, 0, 320, 240, color);
+    bench.cp("LandscapeFlipped");
+    driver.orient(Orientation::Portrait);
+    let color = core::iter::repeat(0x180F).take(240 * 320);
+    bench.start();
+    driver.draw_raw_iter(0, 0, 240, 320, color);
+    bench.cp("Portrait");
+    driver.orient(Orientation::PortraitFlipped);
+    let color = core::iter::repeat(0x780F).take(240 * 320);
+    bench.start();
+    driver.draw_raw_iter(0, 0, 240, 320, color);
+    bench.cp("PortraitFlipped");
 
-    bench.cp("default");
-
-    driver.orient(Orientation::)
-
-    loop {
-        log!("I'm alive");
-        timer.delay_ms(1000);
-    }
-
-
-    let mut display = Builder::new(models::ILI9341Rgb565, di)
-        .display_size(240, 320)
-        .orientation(Orientation { rotation: Rotation::Deg90, mirrored: false })
-        .reset_pin(rst)
-        .init(&mut display_timer).unwrap();
-
-
-    display.clear(Rgb565::CSS_ROYAL_BLUE).unwrap();
+    loop {}
 
 
     let mut game = BrickBreaker::new();
@@ -239,36 +224,38 @@ fn main() -> ! {
 
     let mut logic_avg = RollingAverage::new();
 
-    loop {
-        let frame_start = timer.get_counter();
+    loop {}
 
-        mc_inputs.tick(&mut frug_inputs);
-
-        game.update(&frug_inputs);
-
-        let logic_end = timer.get_counter();
-        let logic_time = (logic_end - frame_start).to_millis();
-
-        logic_avg.add(logic_time);
-
-        game.frugger().draw_frame(&mut display);
-
-        let draw_end = timer.get_counter();
-        let draw_time = (draw_end - logic_end).to_millis();
-        let total_time = (draw_end - frame_start).to_millis();
-        log!("Logic: {logic_time} Draw: {draw_time}, Total: {total_time} / {target_fps}");
-
-        let txt_style = MonoTextStyle::new(&FONT_10X20, if total_time < target_fps { Rgb565::WHITE } else { Rgb565::RED });
-        let rect_style = PrimitiveStyle::with_fill(Rgb565::BLACK);
-        let frame_time = total_time.numtoa_str(10, &mut buf);
-        Rectangle::new(Point::new(0, 0), Size::new(30, 20)).draw_styled(&rect_style, &mut display);
-        let text = Text::new(frame_time, Point::new(0, 15), txt_style);
-        text.draw(&mut display);
-
-        if logic_time < target_fps {
-            timer.delay_ms((target_fps - logic_time) as u32);
-        }
-    }
+    // loop {
+    //     let frame_start = timer.get_counter();
+    //
+    //     mc_inputs.tick(&mut frug_inputs);
+    //
+    //     game.update(&frug_inputs);
+    //
+    //     let logic_end = timer.get_counter();
+    //     let logic_time = (logic_end - frame_start).to_millis();
+    //
+    //     logic_avg.add(logic_time);
+    //
+    //     game.frugger().draw_frame(&mut display);
+    //
+    //     let draw_end = timer.get_counter();
+    //     let draw_time = (draw_end - logic_end).to_millis();
+    //     let total_time = (draw_end - frame_start).to_millis();
+    //     log!("Logic: {logic_time} Draw: {draw_time}, Total: {total_time} / {target_fps}");
+    //
+    //     let txt_style = MonoTextStyle::new(&FONT_10X20, if total_time < target_fps { Rgb565::WHITE } else { Rgb565::RED });
+    //     let rect_style = PrimitiveStyle::with_fill(Rgb565::BLACK);
+    //     let frame_time = total_time.numtoa_str(10, &mut buf);
+    //     Rectangle::new(Point::new(0, 0), Size::new(30, 20)).draw_styled(&rect_style, &mut display);
+    //     let text = Text::new(frame_time, Point::new(0, 15), txt_style);
+    //     text.draw(&mut display);
+    //
+    //     if logic_time < target_fps {
+    //         timer.delay_ms((target_fps - logic_time) as u32);
+    //     }
+    // }
 }
 
 pub fn log_fmt(fmt: fmt::Arguments<'_>) {
