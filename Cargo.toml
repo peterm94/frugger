@@ -29,6 +29,7 @@ numtoa = "0.2.4"
 brickbreaker = { path = "../frugger_games/brickbreaker" }
 fire = { path = "../frugger_games/fire" }
 input_test = { path = "../frugger_games/input_test" }
+worm = { path = "../frugger_games/worm" }
 frugger_core = { path = "frugger_core" }
 usb-device = "0.3.2"
 usbd-serial = "0.2.2"

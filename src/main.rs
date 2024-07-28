@@ -50,6 +50,7 @@ use waveshare_rp2040_zero::hal::timer::{Alarm, Alarm0, Instant};
 use waveshare_rp2040_zero::hal::usb::UsbBus;
 use waveshare_rp2040_zero::pac::interrupt;
 use waveshare_rp2040_zero::pac::Interrupt::TIMER_IRQ_0;
+use worm::Worm;
 
 use frugger_core::{ButtonInput, FruggerGame, FrugInputs};
 
@@ -213,10 +214,11 @@ fn main() -> ! {
     // loop {}
 
 
-    let mut game = BrickBreaker::new();
+    // let mut game = BrickBreaker::new();
+    let mut game = Worm::new(timer.get_counter().ticks());
     // let mut game = InputTest::new();
     // let mut game = Fire::new();
-    let target_fps = 1000 / BrickBreaker::TARGET_FPS;
+    let target_fps = 1000 / Worm::TARGET_FPS;
 
     let mut mc_inputs = McInputs::new(a, b, up, down, left, right);
     let mut frug_inputs = FrugInputs::default();
