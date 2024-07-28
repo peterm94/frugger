@@ -31,6 +31,8 @@ use embedded_hal::digital::OutputPin;
 use embedded_hal::spi::{MODE_0, SpiBus};
 use embedded_hal_bus::spi::ExclusiveDevice;
 use fugit::{MicrosDurationU32, RateExtU32};
+use mipidsi::{Builder, models};
+use mipidsi::options::Rotation;
 use numtoa::NumToA;
 #[allow(unused_imports)]
 use panic_probe as _;
@@ -68,7 +70,6 @@ macro_rules! log {
     }
 }
 mod driver;
-mod ili;
 
 
 #[entry]
@@ -181,35 +182,35 @@ fn main() -> ! {
     let di = SPIInterface::new(spi_bus, dc);
 
 
-    let mut driver = Driver::new(di, rst, display_timer);
-    driver.init_tft_espi();
+    // let mut driver = Driver::new(di, rst, display_timer);
+    // driver.init_tft_espi();
+    //
 
 
-
-    let mut bench = Bencher::new(timer);
-
-    driver.orient(Orientation::Landscape);
-    let color = core::iter::repeat(0x580F).take(240 * 320);
-    bench.start();
-    driver.draw_raw_iter(0, 0, 320, 240, color);
-    bench.cp("Landscape");
-    driver.orient(Orientation::LandscapeFlipped);
-    let color = core::iter::repeat(0x786A).take(240 * 320);
-    bench.start();
-    driver.draw_raw_iter(0, 0, 320, 240, color);
-    bench.cp("LandscapeFlipped");
-    driver.orient(Orientation::Portrait);
-    let color = core::iter::repeat(0x180F).take(240 * 320);
-    bench.start();
-    driver.draw_raw_iter(0, 0, 240, 320, color);
-    bench.cp("Portrait");
-    driver.orient(Orientation::PortraitFlipped);
-    let color = core::iter::repeat(0x780F).take(240 * 320);
-    bench.start();
-    driver.draw_raw_iter(0, 0, 240, 320, color);
-    bench.cp("PortraitFlipped");
-
-    loop {}
+    // let mut bench = Bencher::new(timer);
+    //
+    // driver.orient(Orientation::Landscape);
+    // let color = core::iter::repeat(0x580F).take(240 * 320);
+    // bench.start();
+    // driver.draw_raw_iter(0, 0, 320, 240, color);
+    // bench.cp("Landscape");
+    // driver.orient(Orientation::LandscapeFlipped);
+    // let color = core::iter::repeat(0x786A).take(240 * 320);
+    // bench.start();
+    // driver.draw_raw_iter(0, 0, 320, 240, color);
+    // bench.cp("LandscapeFlipped");
+    // driver.orient(Orientation::Portrait);
+    // let color = core::iter::repeat(0x180F).take(240 * 320);
+    // bench.start();
+    // driver.draw_raw_iter(0, 0, 240, 320, color);
+    // bench.cp("Portrait");
+    // driver.orient(Orientation::PortraitFlipped);
+    // let color = core::iter::repeat(0x780F).take(240 * 320);
+    // bench.start();
+    // driver.draw_raw_iter(0, 0, 240, 320, color);
+    // bench.cp("PortraitFlipped");
+    //
+    // loop {}
 
 
     let mut game = BrickBreaker::new();
@@ -224,38 +225,44 @@ fn main() -> ! {
 
     let mut logic_avg = RollingAverage::new();
 
-    loop {}
+    let mut display = Builder::new(models::ILI9341Rgb565, di)
+        .display_size(240, 320)
+        .orientation(mipidsi::options::Orientation { rotation: Rotation::Deg90, mirrored: false })
+        .reset_pin(rst)
+        .init(&mut display_timer).unwrap();
 
-    // loop {
-    //     let frame_start = timer.get_counter();
-    //
-    //     mc_inputs.tick(&mut frug_inputs);
-    //
-    //     game.update(&frug_inputs);
-    //
-    //     let logic_end = timer.get_counter();
-    //     let logic_time = (logic_end - frame_start).to_millis();
-    //
-    //     logic_avg.add(logic_time);
-    //
-    //     game.frugger().draw_frame(&mut display);
-    //
-    //     let draw_end = timer.get_counter();
-    //     let draw_time = (draw_end - logic_end).to_millis();
-    //     let total_time = (draw_end - frame_start).to_millis();
-    //     log!("Logic: {logic_time} Draw: {draw_time}, Total: {total_time} / {target_fps}");
-    //
-    //     let txt_style = MonoTextStyle::new(&FONT_10X20, if total_time < target_fps { Rgb565::WHITE } else { Rgb565::RED });
-    //     let rect_style = PrimitiveStyle::with_fill(Rgb565::BLACK);
-    //     let frame_time = total_time.numtoa_str(10, &mut buf);
-    //     Rectangle::new(Point::new(0, 0), Size::new(30, 20)).draw_styled(&rect_style, &mut display);
-    //     let text = Text::new(frame_time, Point::new(0, 15), txt_style);
-    //     text.draw(&mut display);
-    //
-    //     if logic_time < target_fps {
-    //         timer.delay_ms((target_fps - logic_time) as u32);
-    //     }
-    // }
+    display.clear(Rgb565::CSS_ROYAL_BLUE).unwrap();
+
+    loop {
+        let frame_start = timer.get_counter();
+
+        mc_inputs.tick(&mut frug_inputs);
+
+        game.update(&frug_inputs);
+
+        let logic_end = timer.get_counter();
+        let logic_time = (logic_end - frame_start).to_millis();
+
+        logic_avg.add(logic_time);
+
+        game.frugger().draw_frame(&mut display);
+
+        let draw_end = timer.get_counter();
+        let draw_time = (draw_end - logic_end).to_millis();
+        let total_time = (draw_end - frame_start).to_millis();
+        log!("Logic: {logic_time} Draw: {draw_time}, Total: {total_time} / {target_fps}");
+
+        let txt_style = MonoTextStyle::new(&FONT_10X20, if total_time < target_fps { Rgb565::WHITE } else { Rgb565::RED });
+        let rect_style = PrimitiveStyle::with_fill(Rgb565::BLACK);
+        let frame_time = total_time.numtoa_str(10, &mut buf);
+        Rectangle::new(Point::new(0, 0), Size::new(30, 20)).draw_styled(&rect_style, &mut display);
+        let text = Text::new(frame_time, Point::new(0, 15), txt_style);
+        text.draw(&mut display);
+
+        if logic_time < target_fps {
+            timer.delay_ms((target_fps - logic_time) as u32);
+        }
+    }
 }
 
 pub fn log_fmt(fmt: fmt::Arguments<'_>) {

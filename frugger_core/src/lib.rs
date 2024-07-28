@@ -151,7 +151,8 @@ impl PixelColor for Palette {
 pub struct Frugger {
     // 320 * 240 / 2
     default_val: u8,
-    frame_data: [u8; 76800],
+    last_frame: [u8; 38400],
+    next_frame: [u8; 38400],
 }
 
 impl Dimensions for Frugger {
@@ -177,36 +178,37 @@ impl Frugger {
         let default_val = bg_col.bits() | (bg_col.bits() << 4);
         Self {
             default_val,
-            frame_data: [u8::MAX; 76800],
+            last_frame: [u8::MAX; 38400],
+            next_frame: [default_val; 38400],
         }
     }
-    // fn get_pixel_value(&self, x: u16, y: u16) -> Palette {
-    //     let pixel_offset = (y as u32 * 320 + x as u32) as usize;
-    //
-    //     // If it's even, we can half it and read the first 4 bits of the byte at the index
-    //     let colour = if pixel_offset % 2 == 0 {
-    //         self.last_frame[pixel_offset / 2] & 0x0F
-    //     } else {
-    //         // Odd number, we have to read bits 5-8
-    //         self.last_frame[pixel_offset / 2] >> 4
-    //     };
-    //
-    //     Palette::from_index(&colour).unwrap()
-    // }
-    //
-    // fn get_pixel_value_next(&self, x: u16, y: u16) -> Palette {
-    //     let pixel_offset = (y as u32 * 320 + x as u32) as usize;
-    //
-    //     // If it's even, we can half it and read the first 4 bits of the byte at the index
-    //     let colour = if pixel_offset % 2 == 0 {
-    //         self.next_frame[pixel_offset / 2] & 0x0F
-    //     } else {
-    //         // Odd number, we have to read bits 5-8
-    //         self.next_frame[pixel_offset / 2] >> 4
-    //     };
-    //
-    //     Palette::from_index(&colour).unwrap()
-    // }
+    fn get_pixel_value(&self, x: u16, y: u16) -> Palette {
+        let pixel_offset = (y as u32 * 320 + x as u32) as usize;
+
+        // If it's even, we can half it and read the first 4 bits of the byte at the index
+        let colour = if pixel_offset % 2 == 0 {
+            self.last_frame[pixel_offset / 2] & 0x0F
+        } else {
+            // Odd number, we have to read bits 5-8
+            self.last_frame[pixel_offset / 2] >> 4
+        };
+
+        Palette::from_index(&colour).unwrap()
+    }
+
+    fn get_pixel_value_next(&self, x: u16, y: u16) -> Palette {
+        let pixel_offset = (y as u32 * 320 + x as u32) as usize;
+
+        // If it's even, we can half it and read the first 4 bits of the byte at the index
+        let colour = if pixel_offset % 2 == 0 {
+            self.next_frame[pixel_offset / 2] & 0x0F
+        } else {
+            // Odd number, we have to read bits 5-8
+            self.next_frame[pixel_offset / 2] >> 4
+        };
+
+        Palette::from_index(&colour).unwrap()
+    }
 
     fn write_pixel_value(&mut self, x: u16, y: u16, colour: Palette) {
         if x >= 320 || y >= 240 { return; }
@@ -214,29 +216,30 @@ impl Frugger {
         let pixel_offset = (y as u32 * 320 + x as u32) as usize;
         let value = colour.bits() & 0x0F;
 
-        // write next to low
-        self.frame_data[pixel_offset] = (self.frame_data[pixel_offset] & 0xF0) | value
+        if pixel_offset % 2 == 0 {
+            self.next_frame[pixel_offset / 2] = (self.next_frame[pixel_offset / 2] & 0xF0) | value;
+        } else {
+            self.next_frame[pixel_offset / 2] = (self.next_frame[pixel_offset / 2] & 0x0F) | (value << 4);
+        }
     }
 
     // TODO this needs to all change. the looping is super slow.
-    // https://github.com/alloncm/MagenBoy/blob/master/rpi/src/drivers/ili9341_gfx_device.rs#L12
-    // have a look at this, maybe we do DMA and implement it ourselves
-    // todo figure out if our orientation the correct scan direction
     pub fn draw_frame<T>(&mut self, display: &mut T) where T: DrawTarget<Color=Rgb565> {
-        // save 1ms by storing this on frugger
         let mut cols = [Rgb565::BLACK; 320];
 
+        // iterate over rows and draw continuous segments
+        // todo we can cut the screen into a grid?
+        // todo make sure the draw direction is the one we actually want for the display
         for y in 0..240 {
             let mut run_start: i32 = -1;
             let mut run_length = 0;
             for x in 0..320 {
-                let mut px = &mut self.frame_data[y * 320 + x];
-                let next = *px & 0x0F;
-                let last = *px >> 4;
+                let next = self.get_pixel_value_next(x, y);
+                let last = self.get_pixel_value(x, y);
 
                 if next != last {
                     if run_start == -1 { run_start = x as _; }
-                    cols[run_length] =  Palette::from_index(&next).unwrap().into();
+                    cols[run_length] = next.into();
                     run_length += 1;
                 } else if run_start != -1 && (next == last) {
                     let area = Rectangle::new(Point::new(run_start, y as _), Size::new(run_length as _, 1));
@@ -250,13 +253,11 @@ impl Frugger {
                     let area = Rectangle::new(Point::new(run_start, y as _), Size::new(run_length as _, 1));
                     display.fill_contiguous(&area, cols);
                 }
-
-                *px = last << 4| self.default_val;
             }
         }
 
-        // self.last_frame = self.next_frame;
-        // self.next_frame.fill(self.default_val);
+        self.last_frame.copy_from_slice(&self.next_frame);
+        self.next_frame.fill(self.default_val);
     }
 }
 
