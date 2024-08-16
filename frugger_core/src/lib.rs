@@ -9,6 +9,11 @@ use embedded_graphics::pixelcolor::{PixelColor, Rgb565};
 use embedded_graphics::prelude::*;
 use embedded_graphics::primitives::Rectangle;
 
+pub trait FruggerEngine<C> {
+
+    fn draw_frame<T>(&mut self, display: &mut T) where T: DrawTarget<Color=C>;
+}
+
 #[derive(Default, Eq, PartialEq)]
 pub enum ButtonState {
     PRESSED,
@@ -173,6 +178,45 @@ impl DrawTarget for Frugger {
     }
 }
 
+impl FruggerEngine<Rgb565> for Frugger {
+
+    fn draw_frame<T>(&mut self, display: &mut T) where T: DrawTarget<Color=Rgb565> {
+        let mut cols = [Rgb565::BLACK; 320];
+
+        // iterate over rows and draw continuous segments
+        // todo we can cut the screen into a grid?
+        // todo make sure the draw direction is the one we actually want for the display
+        for y in 0..240 {
+            let mut run_start: i32 = -1;
+            let mut run_length = 0;
+            for x in 0..320 {
+                let next = self.get_pixel_value_next(x, y);
+                let last = self.get_pixel_value(x, y);
+
+                if next != last {
+                    if run_start == -1 { run_start = x as _; }
+                    cols[run_length] = next.into();
+                    run_length += 1;
+                } else if run_start != -1 && (next == last) {
+                    let area = Rectangle::new(Point::new(run_start, y as _), Size::new(run_length as _, 1));
+                    display.fill_contiguous(&area, cols);
+
+                    run_length = 0;
+                    run_start = -1;
+                }
+
+                if x == 319 && run_start != -1 {
+                    let area = Rectangle::new(Point::new(run_start, y as _), Size::new(run_length as _, 1));
+                    display.fill_contiguous(&area, cols);
+                }
+            }
+        }
+
+        self.last_frame.copy_from_slice(&self.next_frame);
+        self.next_frame.fill(self.default_val);
+    }
+}
+
 impl Frugger {
     pub fn new(bg_col: Palette) -> Self {
         let default_val = bg_col.bits() | (bg_col.bits() << 4);
@@ -222,47 +266,13 @@ impl Frugger {
             self.next_frame[pixel_offset / 2] = (self.next_frame[pixel_offset / 2] & 0x0F) | (value << 4);
         }
     }
-
-    // TODO this needs to all change. the looping is super slow.
-    pub fn draw_frame<T>(&mut self, display: &mut T) where T: DrawTarget<Color=Rgb565> {
-        let mut cols = [Rgb565::BLACK; 320];
-
-        // iterate over rows and draw continuous segments
-        // todo we can cut the screen into a grid?
-        // todo make sure the draw direction is the one we actually want for the display
-        for y in 0..240 {
-            let mut run_start: i32 = -1;
-            let mut run_length = 0;
-            for x in 0..320 {
-                let next = self.get_pixel_value_next(x, y);
-                let last = self.get_pixel_value(x, y);
-
-                if next != last {
-                    if run_start == -1 { run_start = x as _; }
-                    cols[run_length] = next.into();
-                    run_length += 1;
-                } else if run_start != -1 && (next == last) {
-                    let area = Rectangle::new(Point::new(run_start, y as _), Size::new(run_length as _, 1));
-                    display.fill_contiguous(&area, cols);
-
-                    run_length = 0;
-                    run_start = -1;
-                }
-
-                if x == 319 && run_start != -1 {
-                    let area = Rectangle::new(Point::new(run_start, y as _), Size::new(run_length as _, 1));
-                    display.fill_contiguous(&area, cols);
-                }
-            }
-        }
-
-        self.last_frame.copy_from_slice(&self.next_frame);
-        self.next_frame.fill(self.default_val);
-    }
 }
 
 pub trait FruggerGame {
     const TARGET_FPS: u64;
+
+    type Color: PixelColor;
+    type Engine: FruggerEngine<Self::Color>;
     fn update(&mut self, inputs: &FrugInputs);
-    fn frugger(&mut self) -> &mut Frugger;
+    fn frugger(&mut self) -> &mut Self::Engine;
 }

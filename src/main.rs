@@ -4,7 +4,6 @@
 use core::cell::RefCell;
 use core::fmt;
 
-use brickbreaker::BrickBreaker;
 use bsp::entry;
 use bsp::hal::{
     clocks::{Clock, init_clocks_and_plls},
@@ -52,7 +51,7 @@ use waveshare_rp2040_zero::pac::interrupt;
 use waveshare_rp2040_zero::pac::Interrupt::TIMER_IRQ_0;
 use worm::Worm;
 
-use frugger_core::{ButtonInput, FruggerGame, FrugInputs};
+use frugger_core::{ButtonInput, FruggerEngine, FruggerGame, FrugInputs};
 
 use crate::driver::{Driver, Orientation};
 use crate::mc_inputs::McInputs;
