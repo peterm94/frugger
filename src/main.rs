@@ -181,38 +181,6 @@ fn main() -> ! {
 
     let di = SPIInterface::new(spi_bus, dc);
 
-
-    // let mut driver = Driver::new(di, rst, display_timer);
-    // driver.init_tft_espi();
-    //
-
-
-    // let mut bench = Bencher::new(timer);
-    //
-    // driver.orient(Orientation::Landscape);
-    // let color = core::iter::repeat(0x580F).take(240 * 320);
-    // bench.start();
-    // driver.draw_raw_iter(0, 0, 320, 240, color);
-    // bench.cp("Landscape");
-    // driver.orient(Orientation::LandscapeFlipped);
-    // let color = core::iter::repeat(0x786A).take(240 * 320);
-    // bench.start();
-    // driver.draw_raw_iter(0, 0, 320, 240, color);
-    // bench.cp("LandscapeFlipped");
-    // driver.orient(Orientation::Portrait);
-    // let color = core::iter::repeat(0x180F).take(240 * 320);
-    // bench.start();
-    // driver.draw_raw_iter(0, 0, 240, 320, color);
-    // bench.cp("Portrait");
-    // driver.orient(Orientation::PortraitFlipped);
-    // let color = core::iter::repeat(0x780F).take(240 * 320);
-    // bench.start();
-    // driver.draw_raw_iter(0, 0, 240, 320, color);
-    // bench.cp("PortraitFlipped");
-    //
-    // loop {}
-
-
     // let mut game = BrickBreaker::new();
     let mut game = Worm::new(timer.get_counter().ticks());
     // let mut game = InputTest::new();

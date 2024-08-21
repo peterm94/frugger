@@ -11,6 +11,7 @@ pub struct McInputs<A: InputPin, B: InputPin, L: InputPin, R: InputPin, U: Input
     down_pin: D,
 }
 
+
 impl<A: InputPin, B: InputPin, L: InputPin, R: InputPin, U: InputPin, D: InputPin> McInputs<A, B, L, R, U, D> {
     pub fn new(a_pin: A, b_pin: B, up_pin: U, down_pin: D, left_pin: L, right_pin: R) -> Self {
         Self {
