@@ -20,6 +20,8 @@ panic-probe = { version = "0.3", features = ["print-defmt"] }
 
 waveshare-rp2040-zero = "0.8.0"
 mipidsi = "0.8.0"
+ssd1306 = "0.8.4"
+sh1106 = "0.5.0"
 dummy-pin = "1.0.0"
 display-interface-spi = "0.5.0"
 display-interface = "0.5.0"
@@ -30,6 +32,7 @@ brickbreaker = { path = "../frugger_games/brickbreaker" }
 fire = { path = "../frugger_games/fire" }
 input_test = { path = "../frugger_games/input_test" }
 worm = { path = "../frugger_games/worm" }
+runner = { path = "../frugger_games/runner" }
 frugger_core = { path = "frugger_core" }
 usb-device = "0.3.2"
 usbd-serial = "0.2.2"

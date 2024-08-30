@@ -10,13 +10,15 @@ use embedded_graphics::primitives::Rectangle;
 use crate::FruggerEngine;
 
 pub struct OneBit {
-    frame_data: [BinaryColor; 8192],
+    last_frame: [BinaryColor; 8192],
+    next_frame: [BinaryColor; 8192],
 }
 
 impl OneBit {
     pub fn new() -> Self {
         Self {
-            frame_data: [BinaryColor::Off; 8192]
+            last_frame: [BinaryColor::Off; 8192],
+            next_frame: [BinaryColor::Off; 8192],
         }
     }
 }
@@ -34,18 +36,25 @@ impl DrawTarget for OneBit {
 
     fn draw_iter<I>(&mut self, pixels: I) -> Result<(), Self::Error> where I: IntoIterator<Item=Pixel<Self::Color>> {
         for Pixel(point, col) in pixels {
+            if point.x < 0 || point.x > 127 || point.y < 0 || point.y > 63 { continue; }
             let idx = (point.y * 128 + point.x) as usize;
-            if idx > 8192 { continue; }
-            self.frame_data[idx] = col;
+            self.next_frame[idx] = col;
         }
-
         Ok(())
     }
 }
 
 impl FruggerEngine<BinaryColor> for OneBit {
     fn draw_frame<T>(&mut self, display: &mut T) where T: DrawTarget<Color=BinaryColor> {
-        let frame = mem::replace(&mut self.frame_data, [BinaryColor::Off; 8192]);
-        display.fill_contiguous(&self.bounding_box(), frame);
+        for (idx, col) in self.next_frame.iter().enumerate() {
+            let x = idx % 128;
+            let y = idx / 128;
+            if &self.last_frame[idx] != col {
+                display.fill_solid(&Rectangle::new(Point::new(x as _, y as _), Size::new_equal(1)), *col);
+            }
+        }
+
+        mem::swap(&mut self.next_frame, &mut self.last_frame);
+        self.next_frame.fill(BinaryColor::Off);
     }
 }

@@ -18,23 +18,23 @@ use defmt::*;
 use defmt::*;
 #[allow(unused_imports)]
 use defmt_rtt as _f;
-use display_interface_spi::SPIInterface;
-use embedded_graphics::mono_font::ascii::FONT_10X20;
-use embedded_graphics::mono_font::MonoTextStyle;
-use embedded_graphics::pixelcolor::Rgb565;
+use embedded_graphics::pixelcolor::BinaryColor;
 use embedded_graphics::prelude::*;
-use embedded_graphics::primitives::{PrimitiveStyle, Rectangle, StyledDrawable};
-use embedded_graphics::text::Text;
+use embedded_graphics::primitives::{Rectangle, StyledDrawable};
 use embedded_hal::delay::DelayNs;
 use embedded_hal::digital::OutputPin;
-use embedded_hal::spi::{MODE_0, SpiBus};
-use embedded_hal_bus::spi::ExclusiveDevice;
+use embedded_hal::spi::SpiBus;
 use fugit::{MicrosDurationU32, RateExtU32};
-use mipidsi::{Builder, models};
-use mipidsi::options::Rotation;
 use numtoa::NumToA;
 #[allow(unused_imports)]
 use panic_probe as _;
+use runner::Runner;
+use sh1106::Builder;
+use sh1106::mode::GraphicsMode;
+use ssd1306::{I2CDisplayInterface, Ssd1306};
+use ssd1306::mode::DisplayConfig;
+use ssd1306::prelude::DisplayRotation;
+use ssd1306::size::DisplaySize128x64;
 use usb_device::class_prelude::*;
 use usb_device::prelude::*;
 use usbd_serial::{SerialPort, USB_CLASS_CDC};
@@ -42,18 +42,16 @@ use usbd_serial::embedded_io::Write;
 // Provide an alias for our BSP so we can switch targets quickly.
 // Uncomment the BSP you included in Cargo.toml, the rest of the code does not need to change.
 use waveshare_rp2040_zero as bsp;
-use waveshare_rp2040_zero::{hal, XOSC_CRYSTAL_FREQ};
 use waveshare_rp2040_zero::hal::spi::{SpiDevice, State, ValidSpiPinout};
 use waveshare_rp2040_zero::hal::Timer;
 use waveshare_rp2040_zero::hal::timer::{Alarm, Alarm0, Instant};
 use waveshare_rp2040_zero::hal::usb::UsbBus;
 use waveshare_rp2040_zero::pac::interrupt;
 use waveshare_rp2040_zero::pac::Interrupt::TIMER_IRQ_0;
-use worm::Worm;
+use waveshare_rp2040_zero::XOSC_CRYSTAL_FREQ;
 
 use frugger_core::{ButtonInput, FruggerEngine, FruggerGame, FrugInputs};
 
-use crate::driver::{Driver, Orientation};
 use crate::mc_inputs::McInputs;
 
 mod mc_inputs;
@@ -162,30 +160,40 @@ fn main() -> ! {
 
     let dc = pins.gp4.into_push_pull_output();
 
-    let rx = pins.gp0.into_function::<hal::gpio::FunctionSpi>();
-    let tx = pins.gp3.into_function::<hal::gpio::FunctionSpi>();
-    let cs = pins.gp1.into_push_pull_output();
-    let sck = pins.gp2.into_function::<hal::gpio::FunctionSpi>();
-    timer.delay_ms(1000);
+    // let rx = pins.gp0.into_function::<hal::gpio::FunctionSpi>();
+    // let tx = pins.gp3.into_function::<hal::gpio::FunctionSpi>();
+    // let cs = pins.gp1.into_push_pull_output();
+    // let sck = pins.gp2.into_function::<hal::gpio::FunctionSpi>();
+    // timer.delay_ms(1000);
+    //
+    // // let dummy_cs = dummy_pin::DummyPin::new_low();
+    // let spi: bsp::hal::spi::Spi::<_, _, _, 8> = bsp::hal::spi::Spi::new(pac.SPI0, (tx, rx, sck));
+    // let mut spi = spi.init(&mut pac.RESETS, clocks.peripheral_clock.freq(), 500.MHz(), MODE_0);
+    // let baud = spi.set_baudrate(clocks.peripheral_clock.freq(), 63.MHz());
+    // log!("Actual baudrate is {baud}");
+    // let mut spi_timer = timer.clone();
+    //
+    // let spi_bus = ExclusiveDevice::new(spi, cs, &mut spi_timer).unwrap();
+    //
+    // let mut display_timer = timer.clone();
+    //
+    // let di = SPIInterface::new(spi_bus, dc);
+    // let mut display = Builder::new(models::ILI9341Rgb565, di)
+    //     .display_size(240, 320)
+    //     .orientation(mipidsi::options::Orientation { rotation: Rotation::Deg90, mirrored: false })
+    //     .reset_pin(rst)
+    //     .init(&mut display_timer).unwrap();
+    // display.clear(Rgb565::CSS_ROYAL_BLUE).unwrap();
 
-    // let dummy_cs = dummy_pin::DummyPin::new_low();
-    let spi: bsp::hal::spi::Spi::<_, _, _, 8> = bsp::hal::spi::Spi::new(pac.SPI0, (tx, rx, sck));
-    let mut spi = spi.init(&mut pac.RESETS, clocks.peripheral_clock.freq(), 500.MHz(), MODE_0);
-    let baud = spi.set_baudrate(clocks.peripheral_clock.freq(), 63.MHz());
-    log!("Actual baudrate is {baud}");
-    let mut spi_timer = timer.clone();
-
-    let spi_bus = ExclusiveDevice::new(spi, cs, &mut spi_timer).unwrap();
-
-    let mut display_timer = timer.clone();
-
-    let di = SPIInterface::new(spi_bus, dc);
+    let sda_pin = pins.gp0.reconfigure();
+    let scl_pin = pins.gp1.reconfigure();
 
     // let mut game = BrickBreaker::new();
-    let mut game = Worm::new(timer.get_counter().ticks());
+    // let mut game = Worm::new(timer.get_counter().ticks());
     // let mut game = InputTest::new();
     // let mut game = Fire::new();
-    let target_fps = 1000 / Worm::TARGET_FPS;
+    let mut game = Runner::new(timer.get_counter().ticks());
+    let target_fps = 1000 / Runner::TARGET_FPS;
 
     let mut mc_inputs = McInputs::new(a, b, up, down, left, right);
     let mut frug_inputs = FrugInputs::default();
@@ -194,13 +202,17 @@ fn main() -> ! {
 
     let mut logic_avg = RollingAverage::new();
 
-    let mut display = Builder::new(models::ILI9341Rgb565, di)
-        .display_size(240, 320)
-        .orientation(mipidsi::options::Orientation { rotation: Rotation::Deg90, mirrored: false })
-        .reset_pin(rst)
-        .init(&mut display_timer).unwrap();
+    let i2c = bsp::hal::i2c::I2C::i2c0(pac.I2C0, sda_pin, scl_pin, 1.MHz(), &mut pac.RESETS, &clocks.system_clock);
+    let mut display: GraphicsMode<_> = Builder::new().connect_i2c(i2c).into();
+    display.init().unwrap();
+    display.flush().unwrap();
 
-    display.clear(Rgb565::CSS_ROYAL_BLUE).unwrap();
+    // For the little 2 colour one
+    // let interface = I2CDisplayInterface::new(i2c);
+    // let mut display = Ssd1306::new(interface, DisplaySize128x64, DisplayRotation::Rotate0).into_buffered_graphics_mode();
+    // display.init().unwrap();
+
+    log!("test");
 
     loop {
         let frame_start = timer.get_counter();
@@ -215,20 +227,22 @@ fn main() -> ! {
         logic_avg.add(logic_time);
 
         game.frugger().draw_frame(&mut display);
+        display.flush();
 
         let draw_end = timer.get_counter();
         let draw_time = (draw_end - logic_end).to_millis();
         let total_time = (draw_end - frame_start).to_millis();
-        log!("Logic: {logic_time} Draw: {draw_time}, Total: {total_time} / {target_fps}");
+        log!("{}", draw_time);
+        // log!("Logic: {logic_time} Draw: {draw_time}, Total: {total_time} / {target_fps}");
 
-        let txt_style = MonoTextStyle::new(&FONT_10X20, if total_time < target_fps { Rgb565::WHITE } else { Rgb565::RED });
-        let rect_style = PrimitiveStyle::with_fill(Rgb565::BLACK);
-        let frame_time = total_time.numtoa_str(10, &mut buf);
-        Rectangle::new(Point::new(0, 0), Size::new(30, 20)).draw_styled(&rect_style, &mut display);
-        let text = Text::new(frame_time, Point::new(0, 15), txt_style);
-        text.draw(&mut display);
+        // let txt_style = MonoTextStyle::new(&FONT_10X20, if total_time < target_fps { Rgb565::WHITE } else { Rgb565::RED });
+        // let rect_style = PrimitiveStyle::with_fill(Rgb565::BLACK);
+        // let frame_time = total_time.numtoa_str(10, &mut buf);
+        // Rectangle::new(Point::new(0, 0), Size::new(30, 20)).draw_styled(&rect_style, &mut display);
+        // let text = Text::new(frame_time, Point::new(0, 15), txt_style);
+        // text.draw(&mut display);
 
-        if logic_time < target_fps {
+        if total_time < target_fps {
             timer.delay_ms((target_fps - logic_time) as u32);
         }
     }
