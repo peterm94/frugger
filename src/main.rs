@@ -3,6 +3,7 @@
 
 use core::cell::RefCell;
 use core::fmt;
+use core::ops::DerefMut;
 use brickbreaker::BrickBreaker;
 
 use bsp::entry;
@@ -68,12 +69,12 @@ use crate::mc_inputs::McInputs;
 
 mod mc_inputs;
 
-static mut USB_DEVICE: Option<UsbDevice<UsbBus>> = None;
+static USB_DEVICE:  Mutex<RefCell<Option<UsbDevice<UsbBus>>>> = Mutex::new(RefCell::new(None));
 static mut USB_BUS: Option<UsbBusAllocator<UsbBus>> = None;
 static mut USB_SERIAL: Mutex<RefCell<Option<SerialPort<UsbBus>>>> = Mutex::new(RefCell::new(None));
-static mut PICOTOOL: Mutex<RefCell<Option<PicoToolReset<UsbBus>>>> = Mutex::new(RefCell::new(None));
+static PICOTOOL: Mutex<RefCell<Option<PicoToolReset<UsbBus>>>> = Mutex::new(RefCell::new(None));
 
-static mut ALARM_0: Option<Mutex<RefCell<Alarm0>>> = None;
+static ALARM_0: Mutex<RefCell<Option<Alarm0>>> = Mutex::new(RefCell::new(None));
 
 macro_rules! log {
     ($($tts:tt)*) => {
@@ -107,11 +108,6 @@ fn main() -> ! {
 
     let mut delay = cortex_m::delay::Delay::new(core.SYST, clocks.system_clock.freq().to_Hz());
     let mut timer = Timer::new(pac.TIMER, &mut pac.RESETS, &clocks);
-    // let mut alarm_0 = timer.alarm_0().unwrap();
-    // alarm_0.schedule(MicrosDurationU32::millis(8)).unwrap();
-    // alarm_0.enable_interrupt();
-    //
-    // unsafe { ALARM_0 = Some(Mutex::new(RefCell::new(alarm_0))); }
 
     let pins = bsp::Pins::new(
         pac.IO_BANK0,
@@ -119,48 +115,49 @@ fn main() -> ! {
         sio.gpio_bank0,
         &mut pac.RESETS,
     );
-    //
-    // unsafe {
-    //     // Enable the interrupt.
-    //     NVIC::unmask(TIMER_IRQ_0);
-    // }
 
 
-
-
-    // let usb_bus = UsbBusAllocator::new(UsbBus::new(pac.USBCTRL_REGS,
-    //                                                pac.USBCTRL_DPRAM, clocks.usb_clock, true, &mut pac.RESETS));
-    // unsafe {
-    //     USB_BUS = Some(usb_bus);
-    // }
-    // let bus_ref = unsafe { USB_BUS.as_ref().unwrap() };
+    let usb_bus = UsbBusAllocator::new(UsbBus::new(pac.USBCTRL_REGS,
+                                                   pac.USBCTRL_DPRAM, clocks.usb_clock, true, &mut pac.RESETS));
+    unsafe {
+        USB_BUS = Some(usb_bus);
+    }
+    let bus_ref = unsafe { USB_BUS.as_ref().unwrap() };
 
     // let mut serial = SerialPort::new(&usb_bus);
-    // let mut picotool: PicoToolReset<_> = PicoToolReset::new(&usb_bus);
+    let mut picotool: PicoToolReset<_> = PicoToolReset::new(&bus_ref);
 
-    // unsafe {
-    //     PICOTOOL = Mutex::new(RefCell::new(Some(picotool)));
-    //     // USB_SERIAL = Mutex::new(RefCell::new(Some(serial)));
-    // }
+    cortex_m::interrupt::free(|cs| {
+        PICOTOOL.borrow(cs).replace(Some(picotool));
+        // USB_SERIAL = Mutex::new(RefCell::new(Some(serial)));
+    });
 
-    // // TODO only one of the usb devices can be used at once, the serial one needs 0x02, they aren't compatible from what I can see.
-    // //  Make an interrupt for each that can be used.
-    // let mut usb_device = UsbDeviceBuilder::new(&usb_bus, UsbVidPid(0x2E8A, 0x000A))
-    //     .strings(&[StringDescriptors::default()
-    //         .manufacturer("RP2040")
-    //         .product("Picotool port")
-    //         .serial_number("TEST")]).unwrap()
-    //     .device_class(0x00)
-    //     .build();
-    //
-    // loop {
-    //     usb_device.poll(&mut [&mut picotool]);
-    //     delay.delay_ms(8);
-    //     log!("aa");
-    // }
-    // unsafe {
-    //     USB_DEVICE = Some(usb_dev);
-    // }
+    // TODO only one of the usb devices can be used at once, the serial one needs 0x02, they aren't compatible from what I can see.
+    //  Make an interrupt for each that can be used.
+    let usb_device = UsbDeviceBuilder::new(&bus_ref, UsbVidPid(0x2E8A, 0x000A))
+        .strings(&[StringDescriptors::default()
+            .manufacturer("RP2040")
+            .product("Picotool port")
+            .serial_number("TEST")]).unwrap()
+        .device_class(0x00)
+        .build();
+
+    let mut alarm_0 = timer.alarm_0().unwrap();
+    alarm_0.schedule(MicrosDurationU32::millis(8)).unwrap();
+    alarm_0.enable_interrupt();
+
+    cortex_m::interrupt::free(|cs| {
+         ALARM_0.borrow(cs).replace(Some(alarm_0));
+    });
+
+    cortex_m::interrupt::free(|cs| {
+        USB_DEVICE.borrow(cs).replace(Some(usb_device));
+    });
+
+    unsafe {
+        // Enable the interrupt.
+        NVIC::unmask(TIMER_IRQ_0);
+    }
 
     // let mut led_pin = pins.gp5.into_push_pull_output();
 
@@ -341,22 +338,19 @@ impl RollingAverage {
     }
 }
 
-// #[allow(non_snake_case)]
-// #[interrupt]
-// unsafe fn TIMER_IRQ_0() {
-//     cortex_m::interrupt::free(|cs| {
-//         let usb_dev = USB_DEVICE.as_mut().unwrap();
-//         // let serial = USB_SERIAL.borrow(&cs);
-//         // let mut s2 = serial.borrow_mut();
-//         // let s2 = s2.as_mut().unwrap();
-//
-//         let picotool = PICOTOOL.borrow(&cs);
-//         let mut s2 = picotool.borrow_mut();
-//         let s2 = s2.as_mut().unwrap();
-//         usb_dev.poll(&mut [s2]);
-//
-//         let mut alarm = ALARM_0.as_mut().unwrap().borrow(&cs).borrow_mut();
-//         alarm.clear_interrupt();
-//         alarm.schedule(MicrosDurationU32::millis(8)).unwrap();
-//     });
-// }
+#[allow(non_snake_case)]
+#[interrupt]
+unsafe fn TIMER_IRQ_0() {
+    cortex_m::interrupt::free(|cs| {
+        if let Some(usb_dev) = USB_DEVICE.borrow(cs).borrow_mut().deref_mut() {
+            if let Some(picotool) = PICOTOOL.borrow(cs).borrow_mut().deref_mut() {
+                usb_dev.poll(&mut [picotool]);
+            }
+        }
+
+        if let Some(alarm) = ALARM_0.borrow(&cs).borrow_mut().deref_mut() {
+            alarm.schedule(MicrosDurationU32::millis(8)).unwrap();
+            alarm.clear_interrupt();
+        }
+    });
+}
