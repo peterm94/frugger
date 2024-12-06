@@ -60,7 +60,6 @@ use waveshare_rp2040_zero::hal::usb::UsbBus;
 use waveshare_rp2040_zero::pac::interrupt;
 use waveshare_rp2040_zero::pac::Interrupt::TIMER_IRQ_0;
 use waveshare_rp2040_zero::{hal, XOSC_CRYSTAL_FREQ};
-use waveshare_rp2040_zero::hal::rom_data::reset_to_usb_boot;
 use worm::Worm;
 
 use frugger_core::{ButtonInput, FruggerEngine, FruggerGame, FrugInputs};
@@ -69,10 +68,8 @@ use crate::mc_inputs::McInputs;
 
 mod mc_inputs;
 
-static USB_DEVICE:  Mutex<RefCell<Option<UsbDevice<UsbBus>>>> = Mutex::new(RefCell::new(None));
 static mut USB_BUS: Option<UsbBusAllocator<UsbBus>> = None;
 static mut USB_SERIAL: Mutex<RefCell<Option<SerialPort<UsbBus>>>> = Mutex::new(RefCell::new(None));
-static PICOTOOL: Mutex<RefCell<Option<PicoToolReset<UsbBus>>>> = Mutex::new(RefCell::new(None));
 
 static ALARM_0: Mutex<RefCell<Option<Alarm0>>> = Mutex::new(RefCell::new(None));
 
@@ -83,6 +80,12 @@ macro_rules! log {
 }
 mod driver;
 
+static HANDLER: Mutex<RefCell<Option<PicotoolHandler>>> = Mutex::new(RefCell::new(None));
+
+struct PicotoolHandler {
+    picotool: PicoToolReset<'static, UsbBus>,
+    usb_device: UsbDevice<'static, UsbBus>
+}
 
 #[entry]
 fn main() -> ! {
@@ -117,20 +120,15 @@ fn main() -> ! {
     );
 
 
-    let usb_bus = UsbBusAllocator::new(UsbBus::new(pac.USBCTRL_REGS,
-                                                   pac.USBCTRL_DPRAM, clocks.usb_clock, true, &mut pac.RESETS));
     unsafe {
-        USB_BUS = Some(usb_bus);
+        USB_BUS = Some(UsbBusAllocator::new(UsbBus::new(pac.USBCTRL_REGS,
+                                                       pac.USBCTRL_DPRAM, clocks.usb_clock, true, &mut pac.RESETS)));
     }
+
     let bus_ref = unsafe { USB_BUS.as_ref().unwrap() };
 
-    // let mut serial = SerialPort::new(&usb_bus);
     let mut picotool: PicoToolReset<_> = PicoToolReset::new(&bus_ref);
 
-    cortex_m::interrupt::free(|cs| {
-        PICOTOOL.borrow(cs).replace(Some(picotool));
-        // USB_SERIAL = Mutex::new(RefCell::new(Some(serial)));
-    });
 
     // TODO only one of the usb devices can be used at once, the serial one needs 0x02, they aren't compatible from what I can see.
     //  Make an interrupt for each that can be used.
@@ -147,12 +145,16 @@ fn main() -> ! {
     alarm_0.enable_interrupt();
 
     cortex_m::interrupt::free(|cs| {
-         ALARM_0.borrow(cs).replace(Some(alarm_0));
+        HANDLER.borrow(cs).replace(Some(PicotoolHandler {
+            picotool,
+            usb_device,
+        }));
     });
 
     cortex_m::interrupt::free(|cs| {
-        USB_DEVICE.borrow(cs).replace(Some(usb_device));
+         ALARM_0.borrow(cs).replace(Some(alarm_0));
     });
+
 
     unsafe {
         // Enable the interrupt.
@@ -342,10 +344,8 @@ impl RollingAverage {
 #[interrupt]
 unsafe fn TIMER_IRQ_0() {
     cortex_m::interrupt::free(|cs| {
-        if let Some(usb_dev) = USB_DEVICE.borrow(cs).borrow_mut().deref_mut() {
-            if let Some(picotool) = PICOTOOL.borrow(cs).borrow_mut().deref_mut() {
-                usb_dev.poll(&mut [picotool]);
-            }
+        if let Some(handler) = HANDLER.borrow(cs).borrow_mut().deref_mut() {
+                handler.usb_device.poll(&mut [&mut handler.picotool]);
         }
 
         if let Some(alarm) = ALARM_0.borrow(&cs).borrow_mut().deref_mut() {
