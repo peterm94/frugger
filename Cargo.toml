@@ -31,12 +31,14 @@ numtoa = "0.2.4"
 brickbreaker = { path = "../frugger_games/brickbreaker" }
 fire = { path = "../frugger_games/fire" }
 input_test = { path = "../frugger_games/input_test" }
+input_test_small = { path = "../frugger_games/input_test_small" }
 worm = { path = "../frugger_games/worm" }
 runner = { path = "../frugger_games/runner" }
 frugger_core = { path = "frugger_core" }
 usb-device = "0.3.2"
 usbd-serial = "0.2.2"
 usbd-hid = "0.7.0"
+usbd-picotool-reset = "0.3.0"
 # cargo build/run
 [profile.dev]
 codegen-units = 1
