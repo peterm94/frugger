@@ -17,6 +17,8 @@ use embedded_graphics::text::Text;
 use frugger_core::{ButtonInput, FrugInputs, FruggerEngine, FruggerGame};
 use input_test_small::InputTestSmall;
 use numtoa::NumToA;
+use runner::Runner;
+use triangle_jump::Jump;
 use waveshare_rp2040_zero as bsp;
 
 pub(crate) fn start(system_clock: &SystemClock, mut timer: Timer) -> ! {
@@ -70,8 +72,8 @@ pub(crate) fn start(system_clock: &SystemClock, mut timer: Timer) -> ! {
     display.init().unwrap();
     display.flush().unwrap();
 
-    type GAME = InputTestSmall;
-    let mut game = GAME::new();
+    type GAME = Jump;
+    let mut game = GAME::new(timer.get_counter().ticks());
 
     let target_fps = 1000 / GAME::TARGET_FPS;
 

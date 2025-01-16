@@ -57,6 +57,11 @@ pub struct FrugInputs {
     pub down: ButtonState,
 }
 
+pub enum Orientation {
+    Landscape,
+    Portrait
+}
+
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub enum Palette {
     Black,
@@ -153,6 +158,8 @@ impl PixelColor for Palette {
 
 pub trait FruggerGame {
     const TARGET_FPS: u64;
+
+    const ORIENTATION: Orientation;
 
     type Color: PixelColor;
     type Engine: FruggerEngine<Self::Color>;
