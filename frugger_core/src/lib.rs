@@ -1,15 +1,15 @@
 #![cfg_attr(not(test), no_std)]
 
-use embedded_graphics::draw_target::DrawTarget;
-use embedded_graphics::geometry::Dimensions;
-use embedded_graphics::pixelcolor::{PixelColor, Rgb565};
-use embedded_graphics::prelude::*;
+pub mod util;
 
-pub mod frugger;
-pub mod onebit;
+use embedded_graphics::draw_target::DrawTarget;
+use embedded_graphics::Pixel;
+use embedded_graphics::pixelcolor::{PixelColor, Rgb565};
 
 pub trait FruggerEngine<C> {
-    fn draw_frame<T>(&mut self, display: &mut T) where T: DrawTarget<Color=C>;
+    fn draw_frame<T>(&mut self, display: &mut T)
+    where
+        T: DrawTarget<Color = C>;
 }
 
 #[derive(Default, Eq, PartialEq)]
@@ -59,7 +59,7 @@ pub struct FrugInputs {
 
 pub enum Orientation {
     Landscape,
-    Portrait
+    Portrait,
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
@@ -144,17 +144,27 @@ impl Palette {
             13 => Some(Palette::LightGrey),
             14 => Some(Palette::DarkGrey),
             15 => Some(Palette::BlueGrey),
-            _ => None
+            _ => None,
         }
     }
 
-    fn bits(&self) -> u8 {
+    pub fn bits(&self) -> u8 {
         *self as u8
     }
 }
 
 impl PixelColor for Palette {
     type Raw = ();
+}
+
+pub trait FrugTimer {
+    fn ticks(&self) -> u64;
+    fn delay_ms(&mut self, ms: u64);
+}
+
+pub trait FrugDisplay {
+    fn flush(&mut self);
+    fn set_orientation(&mut self, orientation: &Orientation);
 }
 
 pub trait FruggerGame {

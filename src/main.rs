@@ -1,13 +1,10 @@
 #![no_std]
 #![no_main]
 
-use core::ops::DerefMut;
-
 use bsp::entry;
 // Provide an alias for our BSP so we can switch targets quickly.
 // Uncomment the BSP you included in Cargo.toml, the rest of the code does not need to change.
 use bsp::hal::spi::{SpiDevice, State, ValidSpiPinout};
-use bsp::hal::timer::{Alarm, Instant};
 use bsp::hal::usb::UsbBus;
 use bsp::hal::Timer;
 use bsp::hal::{
@@ -21,11 +18,6 @@ use defmt::*;
 use defmt::*;
 #[allow(unused_imports)]
 use defmt_rtt as _f;
-use embedded_graphics::prelude::*;
-use embedded_graphics::primitives::StyledDrawable;
-use embedded_hal::delay::DelayNs;
-use embedded_hal::digital::OutputPin;
-use embedded_hal::spi::SpiBus;
 use fugit::RateExtU32;
 use numtoa::NumToA;
 #[allow(unused_imports)]
@@ -88,55 +80,4 @@ fn main() -> ! {
     restarter::register(timer, &bus_ref);
 
     mini_gb::start(&clocks.system_clock, timer.clone());
-}
-
-pub struct RollingAverage {
-    window: [u64; 10],
-    index: usize,
-    sum: u64,
-}
-
-struct Bencher {
-    timer: Timer,
-    last: Instant,
-}
-
-impl Bencher {
-    fn new(timer: Timer) -> Self {
-        Self {
-            timer,
-            last: timer.get_counter(),
-        }
-    }
-
-    fn start(&mut self) {
-        self.last = self.timer.get_counter();
-    }
-
-    fn cp(&mut self, msg: &str) {
-        let end = self.timer.get_counter();
-        let time = (end - self.last).to_millis();
-        log!("{msg}: {time}ms");
-        self.last = self.timer.get_counter();
-    }
-}
-
-impl RollingAverage {
-    pub fn new() -> Self {
-        RollingAverage {
-            window: [0; 10],
-            index: 0,
-            sum: 0,
-        }
-    }
-
-    pub fn add(&mut self, val: u64) {
-        self.sum = self.sum - self.window[self.index] + val;
-        self.window[self.index] = val;
-        self.index = (self.index + 1) % 10;
-    }
-
-    pub fn average(&self) -> u64 {
-        self.sum / 10
-    }
 }

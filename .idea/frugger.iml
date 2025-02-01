@@ -5,9 +5,15 @@
       <sourceFolder url="file://$MODULE_DIR$/frugger_core/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/brickbreaker/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/frugger_onebit/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/frugger_rgb/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/one_bit/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/frugger_core/target" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
       <excludeFolder url="file://$MODULE_DIR$/brickbreaker/target" />
+      <excludeFolder url="file://$MODULE_DIR$/frugger_onebit/target" />
+      <excludeFolder url="file://$MODULE_DIR$/frugger_rgb/target" />
+      <excludeFolder url="file://$MODULE_DIR$/one_bit/target" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />

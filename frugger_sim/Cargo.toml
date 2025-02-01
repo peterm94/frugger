@@ -1,0 +1,10 @@
+[package]
+name = "frugger_sim"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+frugger_core = { path = "../../frugger/frugger_core" }
+embedded-graphics = "0.8.1"
+embedded-graphics-simulator = { version = "0.6.0" }
+sdl2 = { version = "0.35.1", features = ["bundled"] }

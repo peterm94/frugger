@@ -1,0 +1,16 @@
+[package]
+name = "frugger_onebit"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+frugger_core = { path = "../frugger_core" }
+#frugger_sim = { path = "../frugger_sim", optional = true }
+embedded-graphics = "0.8.1"
+heapless = "0.8.0"
+libm = "0.2.8"
+rand = { version = "0.8.3", features = ["small_rng"], default-features = false }
+log = "0.4.25"
+
+#[features]
+#std = ["dep:frugger_sim"]
