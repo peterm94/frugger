@@ -14,12 +14,15 @@ use embedded_graphics::pixelcolor::BinaryColor;
 use embedded_graphics::prelude::*;
 use embedded_graphics::primitives::{PrimitiveStyle, Rectangle, StyledDrawable};
 use embedded_graphics::text::Text;
-use frugger_core::{ButtonInput, FrugInputs, FruggerEngine, FruggerGame};
-use input_test_small::InputTestSmall;
+use gb_main::GbMain;
+use frugger_core::{ButtonInput, FrugInputs, FruggerEngine, FruggerGame, Orientation};
 use numtoa::NumToA;
-use runner::Runner;
 use triangle_jump::Jump;
 use waveshare_rp2040_zero as bsp;
+
+
+#[link_section = ".data_storage"]
+static mut DATA_STORAGE: [u8; 1024] = [0u8; 1024];
 
 pub(crate) fn start(system_clock: &SystemClock, mut timer: Timer) -> ! {
     // I don't know if I like this, but it seems necessary(?)
@@ -72,8 +75,14 @@ pub(crate) fn start(system_clock: &SystemClock, mut timer: Timer) -> ! {
     display.init().unwrap();
     display.flush().unwrap();
 
-    type GAME = Jump;
-    let mut game = GAME::new(timer.get_counter().ticks());
+    type GAME = GbMain;
+    let mut game = GAME::new(unsafe { DATA_STORAGE.as_mut_ptr() });
+
+    match GAME::ORIENTATION {
+        Orientation::Landscape => {}
+        Orientation::Portrait => { display.set_rotation(DisplayRotation::Rotate90); }
+    }
+
 
     let target_fps = 1000 / GAME::TARGET_FPS;
 

@@ -82,6 +82,7 @@ pub enum Palette {
     BlueGrey,
 }
 
+#[allow(non_upper_case_globals)]
 impl Palette {
     const BlackC: Rgb565 = Rgb565::new(3, 7, 5);
     const PurpleC: Rgb565 = Rgb565::new(11, 10, 11);

@@ -33,6 +33,7 @@ fire = { path = "../frugger_games/fire" }
 input_test = { path = "../frugger_games/input_test" }
 input_test_small = { path = "../frugger_games/input_test_small" }
 triangle_jump = { path = "../frugger_games/triangle_jump" }
+gb_main = { path = "../frugger_games/gb_main" }
 worm = { path = "../frugger_games/worm" }
 runner = { path = "../frugger_games/runner" }
 frugger_core = { path = "frugger_core" }
