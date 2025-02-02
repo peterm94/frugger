@@ -49,8 +49,8 @@ impl Jump {
 
     const PLAYER_STYLE: PrimitiveStyle<BinaryColor> =
         PrimitiveStyle::with_stroke(BinaryColor::On, 1);
-    const LEFT: f32 = 1.0;
-    const RIGHT: f32 = -1.0;
+    const LEFT: f32 = -1.0;
+    const RIGHT: f32 = 1.0;
 
     const PLAT_WIDTH: u32 = 10;
     const PLAT_HALF_W: f32 = Self::PLAT_WIDTH as f32 / 2.0 + 5.0;
@@ -72,9 +72,9 @@ impl FruggerGame for Jump {
 
     fn update(&mut self, inputs: &FrugInputs) {
         // Inputs
-        if inputs.a.down() {
+        if inputs.left.down() {
             self.state.player_pos.0 += Self::LEFT;
-        } else if inputs.b.down() {
+        } else if inputs.right.down() {
             self.state.player_pos.0 += Self::RIGHT;
         }
 

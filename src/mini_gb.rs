@@ -42,22 +42,22 @@ pub(crate) fn start(system_clock: &SystemClock, mut timer: Timer) -> ! {
     );
 
     // Set up inputs
-    let left_pin = pins.gp15.into_pull_up_input();
+    let left_pin = pins.gp4.into_pull_up_input();
     let left = left_pin.as_input();
-    let right_pin = pins.gp14.into_pull_up_input();
+    let right_pin = pins.gp3.into_pull_up_input();
     let right = right_pin.as_input();
 
-    // let up_pin = pins.gp27.into_pull_up_input();
-    let up_pin = pins.gp3.into_pull_up_input();
+    let up_pin = pins.gp27.into_pull_up_input();
+    // let up_pin = pins.gp3.into_pull_up_input();
     let up = up_pin.as_input();
     let down_pin = pins.gp26.into_pull_up_input();
     let down = down_pin.as_input();
 
-    // let a_pin = pins.gp7.into_pull_up_input();
     let a_pin = pins.gp2.into_pull_up_input();
+    // let a_pin = pins.gp2.into_pull_up_input();
     let a = a_pin.as_input();
-    // let b_pin = pins.gp8.into_pull_up_input();
-    let b_pin = pins.gp4.into_pull_up_input();
+    let b_pin = pins.gp8.into_pull_up_input();
+    // let b_pin = pins.gp4.into_pull_up_input();
     let b = b_pin.as_input();
 
     let mut hw_inputs = McInputs::new(a, b, up, down, left, right);

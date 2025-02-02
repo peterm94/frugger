@@ -105,11 +105,11 @@ impl FruggerGame for Menu {
         }
 
         // Inputs
-        if inputs.a.pressed() {
+        if inputs.right.pressed() {
             self.selection = (self.selection + 1) % 3;
-        } else if inputs.b.pressed() {
+        } else if inputs.left.pressed() {
             self.selection = (self.selection + 2) % 3;
-        } else if inputs.up.pressed() {
+        } else if inputs.a.pressed() {
             // start the game
             self.curr_game = match self.selection {
                 0 => Some(Game::TriangleJump(Jump::new(self.ticks))),

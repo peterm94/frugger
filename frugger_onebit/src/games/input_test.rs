@@ -37,13 +37,13 @@ impl FruggerGame for InputTestSmall {
     type Engine = OneBit;
 
     fn update(&mut self, inputs: &FrugInputs) {
-        let a = Rectangle::new(Point::new(10, 20), Size::new_equal(30));
-        let b = Rectangle::new(Point::new(50, 20), Size::new_equal(30));
-        let up = Rectangle::new(Point::new(90, 20), Size::new_equal(30));
+        let left = Rectangle::new(Point::new(10, 20), Size::new_equal(30));
+        let a = Rectangle::new(Point::new(50, 20), Size::new_equal(30));
+        let right = Rectangle::new(Point::new(90, 20), Size::new_equal(30));
 
+        InputTestSmall::draw_styled(&inputs.left, &left, &mut self.engine);
         InputTestSmall::draw_styled(&inputs.a, &a, &mut self.engine);
-        InputTestSmall::draw_styled(&inputs.b, &b, &mut self.engine);
-        InputTestSmall::draw_styled(&inputs.up, &up, &mut self.engine);
+        InputTestSmall::draw_styled(&inputs.right, &right, &mut self.engine);
     }
 
     fn frugger(&mut self) -> &mut Self::Engine {
