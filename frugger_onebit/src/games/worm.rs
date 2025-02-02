@@ -4,7 +4,7 @@ use embedded_graphics::prelude::Point;
 use embedded_graphics::primitives::{Circle, PrimitiveStyle, StyledDrawable};
 use frugger_core::{FrugInputs, FruggerGame, Orientation};
 use heapless::Deque;
-use libm::{cosf, roundf, sinf};
+use libm::{cosf, roundf, sinf, sqrt};
 use rand::prelude::SmallRng;
 use rand::{Rng, SeedableRng};
 
@@ -81,8 +81,7 @@ impl Distance for Point {
     fn distance(&self, other: &Point) -> f32 {
         let dx = (self.x - other.x).pow(2);
         let dy = (self.y - other.y).pow(2);
-        // ((dx + dy) as f64).sqrt() as f32
-        1.0
+        sqrt((dx + dy) as f64) as f32
     }
 }
 

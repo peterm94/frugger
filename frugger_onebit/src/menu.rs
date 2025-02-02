@@ -57,6 +57,8 @@ pub struct Menu {
     curr_game: Option<Game>,
     game_changed: bool,
     selection: u8,
+    ticks: u64,
+    pause_start: u64,
 }
 
 impl Menu {
@@ -66,6 +68,8 @@ impl Menu {
             selection: 0,
             game_changed: false,
             curr_game: None,
+            ticks: 0,
+            pause_start: 0,
         }
     }
 }
@@ -77,6 +81,24 @@ impl FruggerGame for Menu {
     type Engine = OneBit;
 
     fn update(&mut self, inputs: &FrugInputs) {
+        self.ticks.wrapping_add(1);
+
+        if inputs.left.down() && inputs.right.down() {
+            self.pause_start += 1;
+            if self.pause_start == 120 {
+
+                // Force a full screen redraw
+                Rectangle::new(Point::zero(), Size::new(64, 128)).draw_styled(
+                    &PrimitiveStyle::with_fill(BinaryColor::On),
+                    &mut self.engine,
+                );
+                self.curr_game = None;
+                return;
+            }
+        } else {
+            self.pause_start = 0;
+        }
+
         if let Some(game) = &mut self.curr_game {
             game.update(inputs);
             return;
@@ -90,10 +112,10 @@ impl FruggerGame for Menu {
         } else if inputs.up.pressed() {
             // start the game
             self.curr_game = match self.selection {
-                0 => Some(Game::TriangleJump(Jump::new(14545))),
-                1 => Some(Game::Worm(SmolWorm::new(1245))),
-                2 => Some(Game::Racer(Racer::new(1245))),
-                _ => None
+                0 => Some(Game::TriangleJump(Jump::new(self.ticks))),
+                1 => Some(Game::Worm(SmolWorm::new(self.ticks))),
+                2 => Some(Game::Racer(Racer::new(self.ticks))),
+                _ => None,
             };
 
             if let Some(game) = &mut self.curr_game {
