@@ -1,21 +1,17 @@
+use crate::util::SM;
+use crate::OneBit;
 use embedded_graphics::pixelcolor::BinaryColor;
 use embedded_graphics::prelude::*;
 use embedded_graphics::primitives::{PrimitiveStyle, Rectangle, StyledDrawable};
 use frugger_core::{FrugInputs, FruggerGame, Orientation};
-use heapless::Deque;
+use heapless::Vec;
 use rand::prelude::SmallRng;
-use rand::SeedableRng;
-use crate::OneBit;
-
-struct Tile {
-    pos: Point,
-    on: bool,
-}
+use rand::{Rng, SeedableRng};
 
 struct State {
     rng: SmallRng,
-    tiles: [Tile; 3],
-    sequence: Deque<u8, 100>,
+    tiles: [Point; 3],
+    sequence: Vec<u8, 100>,
     ptr: usize,
     timer: u64,
     showing: bool,
@@ -24,6 +20,7 @@ struct State {
 pub struct MatchMe {
     engine: OneBit,
     state: State,
+    sm: SM<State>,
 }
 
 impl MatchMe {
@@ -31,37 +28,116 @@ impl MatchMe {
     const PRESSED: PrimitiveStyle<BinaryColor> = PrimitiveStyle::with_stroke(BinaryColor::On, 10);
     const OFF: PrimitiveStyle<BinaryColor> = PrimitiveStyle::with_stroke(BinaryColor::On, 1);
 
+    fn draw_blank(tiles: &[Point; 3], engine: &mut OneBit) {
+        for tile in tiles {
+            MatchMe::draw_tile(tile, false, engine);
+        }
+    }
+
     pub fn new(rng: u64) -> Self {
+        let mut sm = SM::new();
+
+        // Start timer, give it a bit
+        sm.add(
+            0,
+            |state: &mut State, inputs: &FrugInputs, engine: &mut OneBit| {
+                state.timer -= 1;
+                MatchMe::draw_blank(&state.tiles, engine);
+                return if state.timer == 0 { 1 } else { 0 };
+            },
+        );
+
+        // Play it
+        sm.add(
+            1,
+            |state: &mut State, inputs: &FrugInputs, engine: &mut OneBit| {
+                // Set timer for how long to show the current state
+                if state.timer == 0 {
+                    state.timer = 30;
+                }
+
+                state.timer -= 1;
+
+                // TODO add some downtime for the timer too so you can see repeats
+
+                // If timer runs out, go to next item in sequence
+                if state.timer == 0 {
+                    state.ptr += 1;
+
+                    // At the end, move to input mode and reset the pointer
+                    if state.sequence.len() == state.ptr {
+                        state.ptr = 0;
+                        return 2;
+                    }
+                }
+
+                for (i, tile) in state.tiles.iter().enumerate() {
+                    MatchMe::draw_tile(tile, i == state.sequence[state.ptr] as usize, engine);
+                }
+                return 1;
+            },
+        );
+
+        // User turn
+        sm.add(
+            2,
+            |state: &mut State, inputs: &FrugInputs, engine: &mut OneBit| {
+                MatchMe::draw_tile(&state.tiles[0], inputs.left.down(), engine);
+                MatchMe::draw_tile(&state.tiles[1], inputs.a.down(), engine);
+                MatchMe::draw_tile(&state.tiles[2], inputs.right.down(), engine);
+
+                let req = state.sequence[state.ptr] as usize;
+
+                // TODO incorrect = lose
+                if inputs.left.pressed() {
+                    if req == 0 {
+                        // Correct, move pointer
+                        state.ptr += 1;
+                    }
+                } else if inputs.a.pressed() {
+                    if req == 1 {
+                        // Correct, move pointer
+                        state.ptr += 1;
+                    }
+                } else if inputs.right.pressed() {
+                    if req == 2 {
+                        // Correct, move pointer
+                        state.ptr += 1;
+                    }
+                }
+
+                if state.sequence.len() == state.ptr {
+                    // Correct! add to sequence, start again
+                    state.sequence.push(state.rng.gen_range(0..=2));
+                    state.ptr = 0;
+                    return 1;
+                }
+
+                return 2;
+            },
+        );
+
+        let mut sequence = Vec::new();
+        sequence.push(1);
+
         Self {
             engine: OneBit::new(Self::ORIENTATION),
             state: State {
                 rng: SmallRng::seed_from_u64(rng),
-                tiles: [
-                    Tile {
-                        pos: Point::new(4, 50),
-                        on: false,
-                    },
-                    Tile {
-                        pos: Point::new(24, 70),
-                        on: false,
-                    },
-                    Tile {
-                        pos: Point::new(44, 50),
-                        on: false,
-                    },
-                ],
-                sequence: Deque::new(),
+                tiles: [Point::new(4, 50), Point::new(24, 70), Point::new(44, 50)],
+                sequence,
                 ptr: 0,
-                timer: 60 * MatchMe::TARGET_FPS,
+                timer: 2 * MatchMe::TARGET_FPS,
                 showing: true,
             },
+            sm,
         }
     }
 
-    fn draw_tile(tile: &Tile, engine: &mut <MatchMe as FruggerGame>::Engine) {
+    fn draw_tile(tile: &Point, active: bool, engine: &mut <MatchMe as FruggerGame>::Engine) {
         Self::RECT
-            .translate(tile.pos)
-            .draw_styled(if tile.on { &Self::PRESSED } else { &Self::OFF }, engine)
+            .translate(*tile)
+            .draw_styled(if active { &Self::PRESSED } else { &Self::OFF }, engine)
             .unwrap()
     }
 }
@@ -73,16 +149,7 @@ impl FruggerGame for MatchMe {
     type Engine = OneBit;
 
     fn update(&mut self, inputs: &FrugInputs) {
-        let state = &mut self.state;
-
-        if state.timer == 0 {
-        } else {
-            state.timer -= 1;
-        }
-
-        for tile in &self.state.tiles {
-            MatchMe::draw_tile(tile, &mut self.engine);
-        }
+        self.sm.tick(&mut self.state, inputs, &mut self.engine);
     }
 
     fn frugger(&mut self) -> &mut Self::Engine {

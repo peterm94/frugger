@@ -2,6 +2,7 @@
 
 mod games;
 pub mod menu;
+mod util;
 
 use core::convert::Infallible;
 use core::mem;

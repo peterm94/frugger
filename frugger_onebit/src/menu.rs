@@ -106,15 +106,16 @@ impl FruggerGame for Menu {
 
         // Inputs
         if inputs.right.pressed() {
-            self.selection = (self.selection + 1) % 3;
+            self.selection = (self.selection + 1) % 4;
         } else if inputs.left.pressed() {
-            self.selection = (self.selection + 2) % 3;
+            self.selection = (self.selection + 3) % 4;
         } else if inputs.a.pressed() {
             // start the game
             self.curr_game = match self.selection {
                 0 => Some(Game::TriangleJump(Jump::new(self.ticks))),
                 1 => Some(Game::Worm(SmolWorm::new(self.ticks))),
                 2 => Some(Game::Racer(Racer::new(self.ticks))),
+                3 => Some(Game::MatchMe(MatchMe::new(self.ticks))),
                 _ => None,
             };
 
@@ -137,6 +138,10 @@ impl FruggerGame for Menu {
         text.draw(&mut self.engine).unwrap();
 
         let mut text = Text::new("Racer", Point::new(32, 60), txt_style);
+        text.text_style.alignment = Alignment::Center;
+        text.draw(&mut self.engine).unwrap();
+
+        let mut text = Text::new("Match", Point::new(32, 75), txt_style);
         text.text_style.alignment = Alignment::Center;
         text.draw(&mut self.engine).unwrap();
 

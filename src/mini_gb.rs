@@ -101,7 +101,7 @@ pub(crate) fn start(system_clock: &SystemClock, mut timer: Timer) -> ! {
         logic_avg.add(logic_time);
 
         menu.frugger().draw_frame(&mut display);
-        display.flush();
+        let _ = display.flush();
 
         let draw_end = timer.get_counter().ticks();
         let draw_time = draw_end - logic_end;

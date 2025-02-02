@@ -229,7 +229,7 @@ impl<SPI, RESET, DELAY> Driver<SPI, RESET, DELAY> where SPI: WriteOnlyDataComman
 
     fn write_iter<I: IntoIterator<Item=u16>>(&mut self, data: I) {
         self.cmd(MemoryWrite, &[]);
-        self.spi.send_data(U16BEIter(&mut data.into_iter()));
+        let _ = self.spi.send_data(U16BEIter(&mut data.into_iter()));
     }
 
     // fn write_slice(&mut self, data: &[u16]) {
