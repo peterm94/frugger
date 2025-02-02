@@ -35,7 +35,6 @@ impl SmolWorm {
         let mut segments = Deque::new();
         segments.push_back(Pos(32.0, 64.0));
 
-
         let mut worm = Self {
             engine: OneBit::new(Self::ORIENTATION),
             state: GameState {
@@ -67,7 +66,6 @@ impl SmolWorm {
         new_head.0 = (new_head.0 + 64.0) % 64.0;
         new_head.1 = (new_head.1 + 128.0) % 128.0;
 
-
         self.state.segments.push_front(new_head.clone());
         new_head
     }
@@ -95,7 +93,6 @@ impl FruggerGame for SmolWorm {
     type Engine = OneBit;
 
     fn update(&mut self, inputs: &FrugInputs) {
-
         // inputs
         if inputs.left.down() {
             self.state.dir -= 0.2 * (self.state.speed / 2.0);
@@ -105,7 +102,6 @@ impl FruggerGame for SmolWorm {
             self.state.dir += 0.2 * (self.state.speed / 2.0);
         }
 
-
         let head = self.add_head();
 
         // Pad the collision box a bit
@@ -113,8 +109,10 @@ impl FruggerGame for SmolWorm {
             // Don't remove the tail, move the apple
             self.add_head();
             self.add_head();
-            self.state.apple.top_left = Point::new(self.state.rng.gen_range(2..62),
-                                                   self.state.rng.gen_range(2..126));
+            self.state.apple.top_left = Point::new(
+                self.state.rng.gen_range(2..62),
+                self.state.rng.gen_range(2..126),
+            );
             self.state.speed += 0.035;
         } else {
             // Remove the tail so we stay the same length
@@ -122,10 +120,15 @@ impl FruggerGame for SmolWorm {
         }
 
         for seg in &self.state.segments {
-            Circle::with_center(seg.point(), 2).draw_styled(&Self::WORM_STYLE, &mut self.engine).unwrap();
+            Circle::with_center(seg.point(), 2)
+                .draw_styled(&Self::WORM_STYLE, &mut self.engine)
+                .unwrap();
         }
 
-        self.state.apple.draw_styled(&Self::APPLE_STYLE, &mut self.engine).unwrap();
+        self.state
+            .apple
+            .draw_styled(&Self::APPLE_STYLE, &mut self.engine)
+            .unwrap();
     }
 
     fn frugger(&mut self) -> &mut Self::Engine {

@@ -1,6 +1,7 @@
 #![cfg_attr(not(test), no_std)]
 
-pub mod games;
+mod games;
+pub mod menu;
 
 use core::convert::Infallible;
 use core::mem;

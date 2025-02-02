@@ -9,9 +9,9 @@ use bsp::pac;
 use embedded_hal::delay::DelayNs;
 use frugger_core::util::RollingAverage;
 use frugger_core::{ButtonInput, FrugInputs, FrugTimer, FruggerEngine, FruggerGame};
-use frugger_onebit::games::triangle_jump::Jump;
 use sh1106::interface::DisplayInterface;
 use waveshare_rp2040_zero as bsp;
+use frugger_onebit::menu::Menu;
 
 #[link_section = ".data_storage"]
 static mut DATA_STORAGE: [u8; 1024] = [0u8; 1024];
@@ -81,7 +81,7 @@ pub(crate) fn start(system_clock: &SystemClock, mut timer: Timer) -> ! {
     let mut inputs = FrugInputs::default();
     display.set_rotation(DisplayRotation::Rotate90);
 
-    let mut game = Jump::new(timer.get_counter().ticks());
+    let mut menu=  Menu::new();
 
     let mut logic_avg = RollingAverage::new();
     let target_fps = 60;
@@ -89,16 +89,18 @@ pub(crate) fn start(system_clock: &SystemClock, mut timer: Timer) -> ! {
     loop {
         let frame_start = timer.get_counter().ticks();
 
+        // TODO detect x frames held for restart/pause
+
         // Update inputs
         hw_inputs.tick(&mut inputs);
 
-        game.update(&mut inputs);
+        menu.update(&mut inputs);
 
         let logic_end = timer.get_counter().ticks();
         let logic_time = logic_end - frame_start;
         logic_avg.add(logic_time);
 
-        game.frugger().draw_frame(&mut display);
+        menu.frugger().draw_frame(&mut display);
         display.flush();
 
         let draw_end = timer.get_counter().ticks();
