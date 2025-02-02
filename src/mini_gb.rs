@@ -1,5 +1,4 @@
 use crate::mc_inputs::McInputs;
-use core::cell::RefCell;
 use fugit::RateExtU32;
 use sh1106::prelude::*;
 use sh1106::Builder;
@@ -7,11 +6,10 @@ use sh1106::Builder;
 use bsp::hal::clocks::SystemClock;
 use bsp::hal::{Sio, Timer};
 use bsp::pac;
-use embedded_graphics::Pixel;
-use embedded_graphics::pixelcolor::BinaryColor;
-use embedded_graphics::prelude::DrawTarget;
-use frugger_core::{ButtonInput, FrugDisplay, FrugTimer, Orientation};
-use frugger_onebit::{OneBitDisplay, OneBitRunner};
+use embedded_hal::delay::DelayNs;
+use frugger_core::util::RollingAverage;
+use frugger_core::{ButtonInput, FrugInputs, FrugTimer, FruggerEngine, FruggerGame};
+use frugger_onebit::games::triangle_jump::Jump;
 use sh1106::interface::DisplayInterface;
 use waveshare_rp2040_zero as bsp;
 
@@ -27,43 +25,6 @@ impl FrugTimer for HalTimer {
 
     fn delay_ms(&mut self, ms: u64) {
         embedded_hal::delay::DelayNs::delay_ms(&mut self.0, ms as u32);
-    }
-}
-
-struct SmallDisplay<DI>(GraphicsMode<DI>)
-where
-    DI: DisplayInterface;
-
-// TODO not like this
-impl<DI> DrawTarget<Color = BinaryColor> for SmallDisplay<DI>
-where
-    DI: DisplayInterface,{
-    type Color = ;
-    type Error = ();
-
-    fn draw_iter<I>(&mut self, pixels: I) -> Result<(), Self::Error>
-    where
-        I: IntoIterator<Item=Pixel<Self::Color>>
-    {
-        todo!()
-    }
-}
-impl<DI> FrugDisplay for SmallDisplay<DI>
-where
-    DI: DisplayInterface,
-{
-    fn flush(&mut self) {
-        self.0.flush();
-    }
-    fn set_orientation(&mut self, orientation: &Orientation) {
-        match orientation {
-            Orientation::Landscape => {
-                self.0.set_rotation(DisplayRotation::Rotate0);
-            }
-            Orientation::Portrait => {
-                self.0.set_rotation(DisplayRotation::Rotate90);
-            }
-        }
     }
 }
 
@@ -99,7 +60,7 @@ pub(crate) fn start(system_clock: &SystemClock, mut timer: Timer) -> ! {
     let b_pin = pins.gp4.into_pull_up_input();
     let b = b_pin.as_input();
 
-    let mut hw_inputs = RefCell::new(McInputs::new(a, b, up, down, left, right));
+    let mut hw_inputs = McInputs::new(a, b, up, down, left, right);
 
     // Set up screen
     let sda_pin = pins.gp0.reconfigure();
@@ -117,16 +78,36 @@ pub(crate) fn start(system_clock: &SystemClock, mut timer: Timer) -> ! {
     display.init().unwrap();
     display.flush().unwrap();
 
-    let mut display = OneBitDisplay(SmallDisplay(display));
+    let mut inputs = FrugInputs::default();
+    display.set_rotation(DisplayRotation::Rotate90);
 
-    let mut timer = HalTimer(timer);
+    let mut game = Jump::new(timer.get_counter().ticks());
 
-    let mut runner = OneBitRunner::new(
-        unsafe { DATA_STORAGE.as_mut_ptr() },
-        display,
-        |input| hw_inputs.borrow_mut().tick(input),
-        &mut timer,
-    );
+    let mut logic_avg = RollingAverage::new();
+    let target_fps = 60;
 
-    runner.start();
+    loop {
+        let frame_start = timer.get_counter().ticks();
+
+        // Update inputs
+        hw_inputs.tick(&mut inputs);
+
+        game.update(&mut inputs);
+
+        let logic_end = timer.get_counter().ticks();
+        let logic_time = logic_end - frame_start;
+        logic_avg.add(logic_time);
+
+        game.frugger().draw_frame(&mut display);
+        display.flush();
+
+        let draw_end = timer.get_counter().ticks();
+        let draw_time = draw_end - logic_end;
+        let total_time = draw_end - frame_start;
+
+        // TODO render fps?
+        if total_time < target_fps {
+            timer.delay_ms((target_fps - total_time) as u32);
+        }
+    }
 }

@@ -3,7 +3,6 @@
 pub mod util;
 
 use embedded_graphics::draw_target::DrawTarget;
-use embedded_graphics::Pixel;
 use embedded_graphics::pixelcolor::{PixelColor, Rgb565};
 
 pub trait FruggerEngine<C> {
@@ -160,11 +159,6 @@ impl PixelColor for Palette {
 pub trait FrugTimer {
     fn ticks(&self) -> u64;
     fn delay_ms(&mut self, ms: u64);
-}
-
-pub trait FrugDisplay {
-    fn flush(&mut self);
-    fn set_orientation(&mut self, orientation: &Orientation);
 }
 
 pub trait FruggerGame {

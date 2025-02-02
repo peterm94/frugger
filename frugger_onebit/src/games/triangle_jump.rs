@@ -1,3 +1,4 @@
+use crate::{OneBit};
 use embedded_graphics::pixelcolor::BinaryColor;
 use embedded_graphics::prelude::*;
 use embedded_graphics::primitives::{PrimitiveStyle, Rectangle, StyledDrawable, Triangle};
@@ -5,7 +6,6 @@ use frugger_core::{FrugInputs, FruggerGame, Orientation};
 use libm::roundf;
 use rand::prelude::SmallRng;
 use rand::{Rng, SeedableRng};
-use crate::OneBit;
 
 #[derive(Clone, Default)]
 struct Pos(f32, f32);
