@@ -81,7 +81,7 @@ pub(crate) fn start(system_clock: &SystemClock, mut timer: Timer) -> ! {
     let mut inputs = FrugInputs::default();
     display.set_rotation(DisplayRotation::Rotate90);
 
-    let mut menu=  Menu::new();
+    let mut menu=  Menu::new(|| unsafe { DATA_STORAGE }, |data| unsafe { DATA_STORAGE }.copy_from_slice(&data));
 
     let mut logic_avg = RollingAverage::new();
     let target_fps = 60;

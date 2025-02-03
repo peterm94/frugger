@@ -59,10 +59,12 @@ pub struct Menu {
     selection: u8,
     ticks: u64,
     pause_start: u64,
+    pub load: fn() -> [u8; 1024],
+    pub save: fn([u8; 1024]),
 }
 
 impl Menu {
-    pub fn new() -> Self {
+    pub fn new(load: fn() -> [u8; 1024], save: fn([u8; 1024])) -> Self {
         Self {
             engine: OneBit::new(Self::ORIENTATION),
             selection: 0,
@@ -70,6 +72,8 @@ impl Menu {
             curr_game: None,
             ticks: 0,
             pause_start: 0,
+            load,
+            save,
         }
     }
 }
@@ -81,12 +85,11 @@ impl FruggerGame for Menu {
     type Engine = OneBit;
 
     fn update(&mut self, inputs: &FrugInputs) {
-        self.ticks.wrapping_add(1);
+        self.ticks = self.ticks.wrapping_add(1);
 
         if inputs.left.down() && inputs.right.down() {
             self.pause_start += 1;
             if self.pause_start == 120 {
-
                 // Force a full screen redraw
                 Rectangle::new(Point::zero(), Size::new(64, 128)).draw_styled(
                     &PrimitiveStyle::with_fill(BinaryColor::On),

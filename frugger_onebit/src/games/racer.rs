@@ -78,6 +78,22 @@ impl FruggerGame for Racer {
             Self::PLAYER
         };
 
+        // Collision check
+        let ((l1, l2), (r1, r2)) = &self.state.walls[0];
+        let player_x = self.state.player_pos.0;
+        let v1 = (l2.0 - l1.0, l2.1 - l1.1);
+        let v2 = (player_x - l1.0, 122.0 - l1.1);
+        let cp= v1.0 * v2.1 - v1.1 * v2.0;
+
+        let v1 = (r2.0 - r1.0, r2.1 - r1.1);
+        let v2 = (player_x - r1.0, 122.0 - r1.1);
+        let cp2= v1.0 * v2.1 - v1.1 * v2.0;
+        if cp < 0.0 || cp2 > 0.0 {
+            // TODO gameover
+            return;
+        }
+
+
         // Shift everything to move the screen up
         let move_amt = 2.0;
         if move_amt > 0.0 {
@@ -104,9 +120,9 @@ impl FruggerGame for Racer {
         // Draw player
         sprite
             .translate(self.state.player_pos.point())
-            // .translate_mut(Point::new(0, -10))
             .draw_styled(&Self::PLAYER_STYLE, &mut self.engine)
             .unwrap();
+
 
 
         // Draw score

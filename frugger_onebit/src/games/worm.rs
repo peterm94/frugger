@@ -1,7 +1,11 @@
 use crate::OneBit;
+use embedded_graphics::mono_font::ascii::FONT_8X13;
+use embedded_graphics::mono_font::MonoTextStyle;
 use embedded_graphics::pixelcolor::BinaryColor;
 use embedded_graphics::prelude::Point;
 use embedded_graphics::primitives::{Circle, PrimitiveStyle, StyledDrawable};
+use embedded_graphics::text::{Alignment, Text};
+use embedded_graphics::Drawable;
 use frugger_core::{FrugInputs, FruggerGame, Orientation};
 use heapless::Deque;
 use libm::{cosf, roundf, sinf, sqrt};
@@ -23,6 +27,7 @@ struct GameState {
     dir: f32,
     speed: f32,
     rng: SmallRng,
+    game_over: bool,
 }
 
 pub struct SmolWorm {
@@ -43,6 +48,7 @@ impl SmolWorm {
                 dir: 0.0,
                 speed: 0.5,
                 rng: SmallRng::seed_from_u64(rng),
+                game_over: false,
             },
         };
 
@@ -68,6 +74,15 @@ impl SmolWorm {
 
         self.state.segments.push_front(new_head.clone());
         new_head
+    }
+    fn draw_text(content: &str, engine: &mut OneBit) {
+        let mut text = Text::new(
+            content,
+            Point::new(32, 32),
+            MonoTextStyle::new(&FONT_8X13, BinaryColor::On),
+        );
+        text.text_style.alignment = Alignment::Center;
+        text.draw(engine);
     }
 
     const APPLE_STYLE: PrimitiveStyle<BinaryColor> = PrimitiveStyle::with_fill(BinaryColor::On);
@@ -101,10 +116,20 @@ impl FruggerGame for SmolWorm {
             self.state.dir += 0.2 * (self.state.speed / 2.0);
         }
 
-        let head = self.add_head();
+        let head = if !self.state.game_over {
+            &self.add_head()
+        } else {
+            if self.state.segments.len() == 0 {
+                Self::draw_text("GAME\nOVER", &mut self.engine);
+                return;
+            }
+
+            self.state.segments.front().unwrap()
+        };
+        let head = head.point();
 
         // Pad the collision box a bit
-        if self.state.apple.center().distance(&head.point()) < 3.5 {
+        if self.state.apple.center().distance(&head) < 3.5 {
             // Don't remove the tail, move the apple
             self.add_head();
             self.add_head();
@@ -118,8 +143,14 @@ impl FruggerGame for SmolWorm {
             self.state.segments.pop_back();
         }
 
-        for seg in &self.state.segments {
-            Circle::with_center(seg.point(), 2)
+        for (i, seg) in self.state.segments.iter().enumerate() {
+            let point = seg.point();
+
+            // Check for collisions
+            if i > 10 && point.distance(&head) <= 2.0 {
+                self.state.game_over = true;
+            }
+            Circle::with_center(point, 2)
                 .draw_styled(&Self::WORM_STYLE, &mut self.engine)
                 .unwrap();
         }
