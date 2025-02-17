@@ -205,7 +205,7 @@ impl MatchMe {
     }
 
     fn draw_step(step: usize, engine: &mut OneBit) {
-        let mut buf = [0u8; 10];
+        let mut buf = [0u8; 11];
         let step_str = (step + 1).numtoa_str(10, &mut buf);
         Self::draw_text(step_str, engine);
     }

@@ -14,8 +14,10 @@ use embedded_graphics::primitives::{PrimitiveStyle, Rectangle, StyledDrawable};
 use embedded_graphics::text::{Alignment, Text};
 use embedded_graphics::Drawable;
 use frugger_core::{FrugInputs, FruggerGame, Orientation};
+use crate::hi_score::HiScore;
 
 pub enum Game {
+    Scores(HiScore),
     InputTest(InputTestSmall),
     MatchMe(MatchMe),
     Racer(Racer),
@@ -32,6 +34,7 @@ impl FruggerGame for Game {
 
     fn update(&mut self, inputs: &FrugInputs) {
         match self {
+            Game::Scores(game) => game.update(inputs),
             Game::InputTest(game) => game.update(inputs),
             Game::MatchMe(game) => game.update(inputs),
             Game::Racer(game) => game.update(inputs),
@@ -43,6 +46,7 @@ impl FruggerGame for Game {
 
     fn frugger(&mut self) -> &mut Self::Engine {
         match self {
+            Game::Scores(game) => game.frugger(),
             Game::InputTest(game) => game.frugger(),
             Game::MatchMe(game) => game.frugger(),
             Game::Racer(game) => game.frugger(),
@@ -115,7 +119,8 @@ impl FruggerGame for Menu {
         } else if inputs.a.pressed() {
             // start the game
             self.curr_game = match self.selection {
-                0 => Some(Game::TriangleJump(Jump::new(self.ticks))),
+                0 => Some(Game::Scores(HiScore::new((self.load)().as_slice(), 104))),
+                // 0 => Some(Game::TriangleJump(Jump::new(self.ticks))),
                 1 => Some(Game::Worm(SmolWorm::new(self.ticks))),
                 2 => Some(Game::Racer(Racer::new(self.ticks))),
                 3 => Some(Game::MatchMe(MatchMe::new(self.ticks))),
