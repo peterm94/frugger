@@ -64,11 +64,11 @@ pub struct Menu {
     ticks: u64,
     pause_start: u64,
     pub load: fn() -> [u8; 1024],
-    pub save: fn([u8; 1024]),
+    pub save: fn(usize, [u8; 32]),
 }
 
 impl Menu {
-    pub fn new(load: fn() -> [u8; 1024], save: fn([u8; 1024])) -> Self {
+    pub fn new(load: fn() -> [u8; 1024], save: fn(usize, [u8; 32])) -> Self {
         Self {
             engine: OneBit::new(Self::ORIENTATION),
             selection: 0,
@@ -119,7 +119,7 @@ impl FruggerGame for Menu {
         } else if inputs.a.pressed() {
             // start the game
             self.curr_game = match self.selection {
-                0 => Some(Game::Scores(HiScore::new((self.load)().as_slice(), 104))),
+                0 => Some(Game::Scores(HiScore::new((self.load)().as_slice(), 244, self.save))),
                 // 0 => Some(Game::TriangleJump(Jump::new(self.ticks))),
                 1 => Some(Game::Worm(SmolWorm::new(self.ticks))),
                 2 => Some(Game::Racer(Racer::new(self.ticks))),
