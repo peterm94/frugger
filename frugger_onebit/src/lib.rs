@@ -1,9 +1,9 @@
 #![cfg_attr(not(test), no_std)]
 
 mod games;
+mod hi_score;
 pub mod menu;
 mod util;
-mod hi_score;
 
 use core::convert::Infallible;
 use core::mem;
@@ -14,12 +14,19 @@ use embedded_graphics::prelude::*;
 use embedded_graphics::primitives::Rectangle;
 use embedded_graphics::Pixel;
 use frugger_core::{FrugTimer, FruggerEngine, FruggerGame, Orientation};
+use crate::menu::SaveOffset;
+
+#[derive(Clone)]
+pub enum Signal {
+    Save { score: u16, save_offset: SaveOffset },
+}
 
 pub struct OneBit {
     last_frame: [BinaryColor; 8192],
     next_frame: [BinaryColor; 8192],
     scr_width: usize,
     orientation: Orientation,
+    signal: Option<Signal>,
 }
 
 impl OneBit {
@@ -32,7 +39,13 @@ impl OneBit {
                 Orientation::Portrait => 64,
             },
             orientation,
+            signal: None,
         }
+    }
+
+    pub fn clear_buffer(&mut self) {
+        self.last_frame = [BinaryColor::On; 8192];
+        self.next_frame = [BinaryColor::Off; 8192];
     }
 }
 

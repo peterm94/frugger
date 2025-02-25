@@ -4,7 +4,8 @@ use crate::games::racer::Racer;
 use crate::games::runner::Runner;
 use crate::games::triangle_jump::Jump;
 use crate::games::worm::SmolWorm;
-use crate::OneBit;
+use crate::hi_score::HiScore;
+use crate::{OneBit, Signal};
 use embedded_graphics::geometry::Point;
 use embedded_graphics::mono_font::ascii::FONT_7X13;
 use embedded_graphics::mono_font::MonoTextStyle;
@@ -14,7 +15,6 @@ use embedded_graphics::primitives::{PrimitiveStyle, Rectangle, StyledDrawable};
 use embedded_graphics::text::{Alignment, Text};
 use embedded_graphics::Drawable;
 use frugger_core::{FrugInputs, FruggerGame, Orientation};
-use crate::hi_score::HiScore;
 
 pub enum Game {
     Scores(HiScore),
@@ -24,6 +24,11 @@ pub enum Game {
     Runner(Runner),
     TriangleJump(Jump),
     Worm(SmolWorm),
+}
+
+#[derive(Clone)]
+pub enum SaveOffset {
+    TriangleScores = 0,
 }
 
 impl FruggerGame for Game {
@@ -95,15 +100,32 @@ impl FruggerGame for Menu {
             self.pause_start += 1;
             if self.pause_start == 120 {
                 // Force a full screen redraw
-                Rectangle::new(Point::zero(), Size::new(64, 128)).draw_styled(
-                    &PrimitiveStyle::with_fill(BinaryColor::On),
-                    &mut self.engine,
-                );
+                self.game_changed = true;
                 self.curr_game = None;
                 return;
             }
         } else {
             self.pause_start = 0;
+        }
+
+        if let Some(signal) = self
+            .curr_game
+            .as_mut()
+            .and_then(|game| game.frugger().signal.clone())
+        {
+            match signal {
+                Signal::Save { save_offset, score } => {
+                    let offset = save_offset as usize * 32;
+                    self.curr_game = Some(Game::Scores(HiScore::new(
+                        &(self.load)()[offset..offset + 32],
+                        score,
+                        self.save,
+                    )));
+
+                    self.game_changed = true;
+                    return;
+                }
+            }
         }
 
         if let Some(game) = &mut self.curr_game {
@@ -119,17 +141,13 @@ impl FruggerGame for Menu {
         } else if inputs.a.pressed() {
             // start the game
             self.curr_game = match self.selection {
-                0 => Some(Game::Scores(HiScore::new((self.load)().as_slice(), 244, self.save))),
-                // 0 => Some(Game::TriangleJump(Jump::new(self.ticks))),
+                0 => Some(Game::TriangleJump(Jump::new(self.ticks))),
                 1 => Some(Game::Worm(SmolWorm::new(self.ticks))),
                 2 => Some(Game::Racer(Racer::new(self.ticks))),
                 3 => Some(Game::MatchMe(MatchMe::new(self.ticks))),
                 _ => None,
             };
 
-            if let Some(game) = &mut self.curr_game {
-                game.frugger().clear(BinaryColor::Off);
-            }
             self.game_changed = true;
             return;
         }
@@ -164,17 +182,18 @@ impl FruggerGame for Menu {
     }
 
     fn frugger(&mut self) -> &mut Self::Engine {
-        // If we changed games, we need to render the last frame so we don't get conflicting draw
-        // buffers.
+
+        let engine = if let Some(game) = &mut self.curr_game {
+            game.frugger()
+        } else {
+            &mut self.engine
+        };
+
         if self.game_changed {
             self.game_changed = false;
-            return &mut self.engine;
+            engine.clear_buffer()
         }
 
-        if let Some(game) = &mut self.curr_game {
-            return game.frugger();
-        }
-
-        &mut self.engine
+        engine
     }
 }

@@ -1,4 +1,4 @@
-use crate::{OneBit};
+use crate::{OneBit, Signal};
 use embedded_graphics::pixelcolor::BinaryColor;
 use embedded_graphics::prelude::*;
 use embedded_graphics::primitives::{PrimitiveStyle, Rectangle, StyledDrawable, Triangle};
@@ -6,6 +6,7 @@ use frugger_core::{FrugInputs, FruggerGame, Orientation};
 use libm::roundf;
 use rand::prelude::SmallRng;
 use rand::{Rng, SeedableRng};
+use crate::menu::SaveOffset;
 
 #[derive(Clone, Default)]
 struct Pos(f32, f32);
@@ -111,6 +112,14 @@ impl FruggerGame for Jump {
                 .for_each(|Pos(_, y)| *y += move_amt);
             self.state.player_pos.1 += move_amt;
             self.state.score += move_amt as u32;
+        }
+
+        // dead check
+        if self.state.player_pos.1 > 500.0 {
+            self.engine.signal = Some(Signal::Save {
+                score: self.state.score as u16,
+                save_offset: SaveOffset::TriangleScores,
+            })
         }
 
         // Draw platforms
