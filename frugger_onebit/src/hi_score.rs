@@ -1,7 +1,7 @@
+use crate::ui::RESET_BUTTONS;
 use crate::OneBit;
 use core::fmt::Write;
-use core::str::FromStr;
-use embedded_graphics::mono_font::ascii::{FONT_6X12, FONT_8X13};
+use embedded_graphics::mono_font::ascii::{FONT_5X8, FONT_6X12, FONT_8X13};
 use embedded_graphics::mono_font::MonoTextStyle;
 use embedded_graphics::pixelcolor::BinaryColor;
 use embedded_graphics::prelude::*;
@@ -41,6 +41,8 @@ impl FruggerGame for HiScore {
         Self::draw_header("HI\nSCORES", engine);
         Self::draw_scores(state, engine);
         Self::draw_edit(state, engine);
+        Self::draw_your_score(state, engine);
+        RESET_BUTTONS.draw(engine);
 
         // Nothing to do
         if state.new_score_line == 10 {
@@ -84,23 +86,13 @@ impl HiScore {
     pub fn new(loaded: &[u8], new_score: u16, save_fn: fn(usize, [u8; 32])) -> Self {
         let mut score_table = Vec::new();
 
-        let mut new_score_line = 10;
-
-        // 128 bytes for storage
         // Each record is 6 bytes (bool, entry exists) + 3 bytes (name) + 2 bytes (score)
-        // We will have up to 5 entries which will use 30 / 128 bytes of the storage for the game
+        // We will have up to 5 entries which will use 30 / 32 bytes of the storage for the game
         for i in 0..5 {
             let start = i * 6;
             let end = start + 6;
             let score_slice = &loaded[start..end];
 
-            // blank entry, we can put our hi score in here
-            if score_slice[0] == 0 {
-                new_score_line = i;
-                let default_name = String::<3>::from_str("   ").unwrap();
-                score_table.push((default_name, new_score)).unwrap();
-                break;
-            }
 
             let mut name_str = String::<3>::new();
             name_str.push((score_slice[1] + 65) as char).unwrap();
@@ -108,20 +100,30 @@ impl HiScore {
             name_str.push((score_slice[3] + 65) as char).unwrap();
 
             let score = u16::from_le_bytes(score_slice[4..6].try_into().unwrap());
-
-            // We need to slot the new score in here
-            if new_score_line > 5 && new_score > score {
-                new_score_line = i;
-                let default_name = String::<3>::new();
-                score_table.push((default_name, new_score)).unwrap();
-
-                // Drop the last score if this takes it's place
-                if i == 4 {
-                    break;
-                }
-            }
-
             score_table.push((name_str, score));
+        }
+
+        // Figure out where our new score fits in.
+        let mut new_score_line = 10;
+
+        for (i, (_, score)) in score_table.iter().enumerate() {
+            if new_score > *score {
+                new_score_line = i;
+                break;
+            }
+        }
+        // New entry if there is space but it is the lowest
+        if new_score_line == 10 && score_table.len() < 5 {
+            new_score_line = score_table.len();
+        }
+
+        // Insert it
+        if new_score_line != 10 {
+            if score_table.is_full() {
+                score_table.pop();
+            }
+            let default_name = String::<3>::new();
+            score_table.insert(new_score_line, (default_name, new_score)).unwrap();
         }
 
         Self {
@@ -142,8 +144,7 @@ impl HiScore {
             return;
         }
 
-        let (_, score) = &state.score_table[state.new_score_line];
-        let mut tmp = heapless::String::<3>::new();
+        let mut tmp = String::<3>::new();
 
         for (i, char) in state.new_name.iter().enumerate() {
             if i == state.curr_idx && state.frame % 30 > 15 {
@@ -160,17 +161,6 @@ impl HiScore {
         );
         name_text.text_style.alignment = Alignment::Left;
         name_text.draw(engine);
-
-        // let mut score_text = heapless::String::<11>::new();
-        // write!(&mut score_text, "{}", score).unwrap();
-        //
-        // let mut score_text = Text::new(
-        //     &score_text,
-        //     Point::new(64 - 3, (50 + (state.new_score_line * 10)) as _),
-        //     MonoTextStyle::new(&FONT_6X12, BinaryColor::On),
-        // );
-        // score_text.text_style.alignment = Alignment::Right;
-        // score_text.draw(engine);
     }
     fn draw_scores(state: &State, engine: &mut OneBit) {
         for (line, (name, score)) in state.score_table.iter().enumerate() {
@@ -196,6 +186,19 @@ impl HiScore {
             score_text.text_style.alignment = Alignment::Right;
             score_text.draw(engine);
         }
+    }
+
+    fn draw_your_score(state: &State, engine: &mut OneBit) {
+        let mut score_text = String::<20>::new();
+        write!(&mut score_text, "SCORE: {}", state.new_score).unwrap();
+
+        let mut score_text = Text::new(
+            &score_text,
+            Point::new(32, 106),
+            MonoTextStyle::new(&FONT_5X8, BinaryColor::On),
+        );
+        score_text.text_style.alignment = Alignment::Center;
+        score_text.draw(engine);
     }
 
     fn draw_header(content: &str, engine: &mut OneBit) {

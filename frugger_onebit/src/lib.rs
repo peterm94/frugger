@@ -4,6 +4,7 @@ mod games;
 mod hi_score;
 pub mod menu;
 mod util;
+mod ui;
 
 use core::convert::Infallible;
 use core::mem;

@@ -1,5 +1,5 @@
 use crate::util::SM;
-use crate::OneBit;
+use crate::{OneBit, Signal};
 use embedded_graphics::mono_font::ascii::FONT_8X13;
 use embedded_graphics::mono_font::MonoTextStyle;
 use embedded_graphics::pixelcolor::BinaryColor;
@@ -11,6 +11,7 @@ use heapless::Vec;
 use numtoa::NumToA;
 use rand::prelude::SmallRng;
 use rand::{Rng, SeedableRng};
+use crate::menu::SaveOffset;
 
 struct State {
     rng: SmallRng,
@@ -175,6 +176,16 @@ impl MatchMe {
             5,
             |state: &mut State, inputs: &FrugInputs, engine: &mut OneBit| {
                 Self::draw_text("LOSER", engine);
+                if state.timer == 0 {
+                    state.timer = 60;
+                }
+
+                state.timer -= 1;
+
+                if state.timer == 0 {
+                    engine.signal = Some(Signal::Save {score: state.sequence.len() as u16 - 1, save_offset: SaveOffset::MatchScores});
+                    return 5;
+                }
                 5
             },
         );
@@ -205,8 +216,8 @@ impl MatchMe {
     }
 
     fn draw_step(step: usize, engine: &mut OneBit) {
-        let mut buf = [0u8; 11];
-        let step_str = (step + 1).numtoa_str(10, &mut buf);
+        let mut buf = [0u8; 20];
+        let step_str = ((step + 1) as u16).numtoa_str(10, &mut buf);
         Self::draw_text(step_str, engine);
     }
     fn draw_text(content: &str, engine: &mut OneBit) {

@@ -29,6 +29,7 @@ pub enum Game {
 #[derive(Clone)]
 pub enum SaveOffset {
     TriangleScores = 0,
+    MatchScores = 1,
 }
 
 impl FruggerGame for Game {
