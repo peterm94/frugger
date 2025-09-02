@@ -1,9 +1,11 @@
 use crate::OneBit;
+use embedded_graphics::image::Image;
 use embedded_graphics::pixelcolor::BinaryColor;
 use embedded_graphics::prelude::*;
 use embedded_graphics::primitives::Rectangle;
 use frugger_core::FrugInputs;
 use heapless::LinearMap;
+use tinybmp::Bmp;
 
 type UpdateFn<C> = fn(&mut C, &FrugInputs, &mut OneBit) -> usize;
 
@@ -32,6 +34,24 @@ impl<C> SM<C> {
             self.curr
         }
     }
+}
+
+pub struct Spr<'a> {
+    bmp: Bmp<'a, BinaryColor>,
+}
+
+impl<'a> Spr<'a> {
+    pub fn new(bmp: Bmp<'a, BinaryColor>) -> Self {
+        Spr { bmp }
+    }
+
+    fn draw_at(&self, pos: &Point, target: &mut OneBit) {
+        Image::new(&self.bmp, *pos).draw(target).unwrap();
+    }
+}
+pub fn load_sprite<'a>(bytes: &'a [u8]) -> Spr<'a> {
+    let bmp = Bmp::from_slice(bytes).unwrap();
+    Spr::new(bmp)
 }
 
 pub struct Sprite<'a> {

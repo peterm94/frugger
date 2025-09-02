@@ -1,6 +1,6 @@
 #![cfg_attr(not(test), no_std)]
 
-mod games;
+pub mod games;
 mod hi_score;
 pub mod menu;
 mod util;

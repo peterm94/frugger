@@ -9,9 +9,10 @@ use bsp::pac;
 use embedded_hal::delay::DelayNs;
 use frugger_core::util::RollingAverage;
 use frugger_core::{ButtonInput, FrugInputs, FrugTimer, FruggerEngine, FruggerGame};
-use sh1106::interface::DisplayInterface;
-use waveshare_rp2040_zero as bsp;
 use frugger_onebit::menu::Menu;
+use sh1106::interface::DisplayInterface;
+use ssd1306::prelude::DisplayConfig;
+use waveshare_rp2040_zero as bsp;
 
 #[link_section = ".data_storage"]
 static mut DATA_STORAGE: [u8; 1024] = [0u8; 1024];
@@ -42,18 +43,18 @@ pub(crate) fn start(system_clock: &SystemClock, mut timer: Timer) -> ! {
     );
 
     // Set up inputs
-    let left_pin = pins.gp4.into_pull_up_input();
+    let left_pin = pins.gp14.into_pull_up_input();
     let left = left_pin.as_input();
-    let right_pin = pins.gp3.into_pull_up_input();
+    let right_pin = pins.gp26.into_pull_up_input();
     let right = right_pin.as_input();
 
     let up_pin = pins.gp27.into_pull_up_input();
     // let up_pin = pins.gp3.into_pull_up_input();
     let up = up_pin.as_input();
-    let down_pin = pins.gp26.into_pull_up_input();
+    let down_pin = pins.gp2.into_pull_up_input();
     let down = down_pin.as_input();
 
-    let a_pin = pins.gp2.into_pull_up_input();
+    let a_pin = pins.gp15.into_pull_up_input();
     // let a_pin = pins.gp2.into_pull_up_input();
     let a = a_pin.as_input();
     let b_pin = pins.gp8.into_pull_up_input();
@@ -81,7 +82,8 @@ pub(crate) fn start(system_clock: &SystemClock, mut timer: Timer) -> ! {
     let mut inputs = FrugInputs::default();
     display.set_rotation(DisplayRotation::Rotate90);
 
-    let mut menu=  Menu::new(|| unsafe { DATA_STORAGE }, |data| unsafe { DATA_STORAGE }.copy_from_slice(&data));
+    // let mut menu=  Menu::new(|| unsafe { DATA_STORAGE }, |offset, data| unsafe { DATA_STORAGE }.copy_from_slice(&data));
+    let mut menu = Menu::new(|| unsafe { DATA_STORAGE }, |offset, data| {});
 
     let mut logic_avg = RollingAverage::new();
     let target_fps = 60;

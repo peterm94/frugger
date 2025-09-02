@@ -34,6 +34,9 @@ usb-device = "0.3.2"
 usbd-serial = "0.2.2"
 usbd-hid = "0.7.0"
 usbd-picotool-reset = "0.3.0"
+ws2812-timer-delay = "0.3"
+smart-leds = "0.3"
+smart-leds-trait = "0.3"
 # cargo build/run
 [profile.dev]
 codegen-units = 1
